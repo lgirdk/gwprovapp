@@ -99,6 +99,14 @@ typedef struct mac_addr
 {
     Uint8 hw[ MAC_ADDR_LEN ];
 } macaddr_t;
+
+#elif defined(PUMA6_OR_NEWER_SOC_TYPE)
+
+/* Intel SDK header to define macaddr_t */
+#include <sys_nettypes.h>
+/* Intel SDK header to define STATUS_OK, STATUS_NOK */
+#include <status.h>
+
 #endif
 
 /*! \var typedef enum DOCSIS_Esafe_Db_extIf_e
