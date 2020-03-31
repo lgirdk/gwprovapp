@@ -123,7 +123,7 @@
 /**************************************************************************/
 
 #if !defined (_COSA_BCM_ARM_)
-#define ERNETDEV_MODULE "/fss/gw/lib/modules/3.12.14/drivers/net/erouter_ni.ko"
+#define ERNETDEV_MODULE "/lib/modules/3.12.74/drivers/net/erouter_ni.ko"
 #endif
 #define NETUTILS_IPv6_GLOBAL_ADDR_LEN     	 128
 #define ER_NETDEVNAME "erouter0"
