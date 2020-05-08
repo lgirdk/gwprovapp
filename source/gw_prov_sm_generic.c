@@ -1539,6 +1539,10 @@ pid_t findProcessId(char* processName)
  **************************************************************************/
 int main(int argc, char *argv[])
 {
+    // Buffer characters till newline for stdout and stderr
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
    printf("Started gw_prov_utopia\n");
 
     t2_init("ccsp-gwprovapp");
