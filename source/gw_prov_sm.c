@@ -3572,6 +3572,11 @@ int main(int argc, char *argv[])
 #if defined (_COSA_BCM_ARM_)
     macaddr_t  macAddr_bcm;
 #endif
+
+    // Buffer characters till newline for stdout and stderr
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
     printf("Started gw_prov_utopia\n");
 
     t2_init("ccsp-gwprovapp");
