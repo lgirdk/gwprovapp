@@ -3291,6 +3291,10 @@ static void LAN_start(void)
  **************************************************************************/
 int main(int argc, char *argv[])
 {
+    // Buffer characters till newline for stdout and stderr
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
 #ifdef MULTILAN_FEATURE
     char sysevent_cmd[80];
 #endif
