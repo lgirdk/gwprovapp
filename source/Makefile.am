@@ -34,6 +34,9 @@ gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp
 
 gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog -lsecure_wrapper -ltelemetry_msgsender -lpthread -lutapi -lutctx -lcm_mgnt -lccsp_common
 
+gw_prov_utopia_SOURCES += gw_prov_sm_helper.c
+gw_prov_utopia_LDFLAGS += -lccsp_common -lcm_mgnt
+
 if !PLATFORM_RASPBERRYPI_ENABLED
 if !FEATURE_RDKB_WAN_MANAGER
 if !PLATFORM_PUMA7_ENABLED
