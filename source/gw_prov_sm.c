@@ -83,6 +83,7 @@
 #ifdef FEATURE_SUPPORT_RDKLOG
 #include "rdk_debug.h"
 #endif
+#include "gw_prov_sm_helper.h"
 
 
 #include <telemetry_busmessage_sender.h>
@@ -136,6 +137,7 @@
 #define DEBUG_INI_NAME  "/etc/debug.ini"
 #define COMP_NAME "LOG.RDK.GWPROV"
 #define LOG_INFO 4
+#define TLV_ACS_URL_FILE "/var/tmp/acs-url-tlv-202.txt"
 
 #ifdef MULTILAN_FEATURE
 /* Syscfg keys used for calculating mac addresses of local interfaces and bridges */
@@ -201,6 +203,7 @@ typedef enum {
     EROUTER_MODE,
     IPV4STATUS,
     IPV6STATUS,
+    CFGFILE_APPLY,
     SYSTEM_RESTART,
     BRING_LAN,
     PNM_STATUS,
@@ -223,10 +226,11 @@ typedef struct
     eGwpThreadType mType;       
 } GwpThread_MsgItem;
 
-GwpThread_MsgItem gwpthreadMsgArr[] = {
+static const GwpThread_MsgItem gwpthreadMsgArr[] = {
     {"erouter_mode",                               EROUTER_MODE},
     {"ipv4-status",                                IPV4STATUS},
     {"ipv6-status",                                IPV6STATUS},
+    {"cfgfile_apply",                              CFGFILE_APPLY},
     {"system-restart",                             SYSTEM_RESTART},
     {"bring-lan",                                  BRING_LAN},
     {"pnm-status",                                 PNM_STATUS},
@@ -274,7 +278,6 @@ static int snmp_inited = 0;
 static int pnm_inited = 0;
 static int netids_inited = 0;
 static int gDocTftpOk = 0;
-static int hotspot_started = 0;
 static int lan_telnet_started = 0;
 static int ciscoconnect_started = 0;
 static int webui_started = 0;
@@ -282,13 +285,18 @@ static Uint32 factory_mode = 0;
 static int bridgeModeInBootup = 0;
 
 
-static DOCSIS_Esafe_Db_extIf_e eRouterMode = DOCESAFE_ENABLE_DISABLE_extIf;
-static DOCSIS_Esafe_Db_extIf_e oldRouterMode;
+DOCSIS_Esafe_Db_extIf_e eRouterMode = DOCESAFE_ENABLE_DISABLE_extIf;
+DOCSIS_Esafe_Db_extIf_e oldRouterMode;
 static int sysevent_fd;
 static token_t sysevent_token;
 #if !defined(AUTOWAN_ENABLE)
-static int sysevent_fd_gs;
-static token_t sysevent_token_gs;
+/*
+   Previously these were static if AUTOWAN_ENABLE was not defined, however
+   they are needed by gw_prov_sm_helper.c too, so make them global in all
+   cases. Fixme: to be reviewed.
+*/
+int sysevent_fd_gs;
+token_t sysevent_token_gs;
 #else
 int sysevent_fd_gs;
 token_t sysevent_token_gs;
@@ -317,7 +325,7 @@ static int sIPv6_acquired = 0;
 static void GWP_EnterBridgeMode(void);
 static void GWP_EnterRouterMode(void);
 
-eGwpThreadType Get_GwpThreadType(char * name)
+static eGwpThreadType Get_GwpThreadType(char * name)
 {
     errno_t rc       = -1;
     int     ind      = -1;
@@ -438,12 +446,49 @@ int IsFileExists(const char *fname)
 }
 
 #define TR069PidFile "/var/tmp/CcspTr069PaSsp.pid"
-#define FALSE 0
-#define TRUE 1
+
+/* LGI ADD START */
+static int isACSChangedURL()
+{
+    FILE *fp = NULL;
+    int bACSChangedURL = 0;
+    char Value[256];
+    char *p = NULL;
+
+    fp = popen("psmcli get dmsb.ManagementServer.ACSChangedURL","r");
+    if(fp != NULL)
+    {
+        Value[0] = 0;
+
+        fgets(Value, sizeof(Value), fp);
+
+        /*we need to remove the \n char in buf*/
+        if ((p = strchr(Value, '\n')))
+        {
+            *p = 0;
+        }
+
+        if (strcmp(Value, "0") == 0)
+        {
+            bACSChangedURL = 0;
+        }
+        else
+        {
+            bACSChangedURL = 1;
+        }
+        pclose(fp);
+    }
+
+    return bACSChangedURL;
+}
+/* LGI ADD END */
 
 static bool WriteTr69TlvData(Uint8 typeOfTLV)
 {
 	FILE *fp;
+	FILE *fp_acs;
+	int isTr069Started = 0;
+	char cmd[1024];
 	int bFirstNode = 0;
 	int ret,tempFile;
 	errno_t rc = -1;
@@ -462,6 +507,7 @@ static bool WriteTr69TlvData(Uint8 typeOfTLV)
 	}
 	/* Check if its a fresh boot-up or a boot-up after factory reset*/
 	ret = IsFileExists(TR69_TLVDATA_FILE);
+	isTr069Started = IsFileExists(TR069PidFile);
 
 	if(ret == 0)
 	{
@@ -499,6 +545,12 @@ static bool WriteTr69TlvData(Uint8 typeOfTLV)
 		{
             case GW_SUBTLV_TR069_ENABLE_CWMP_EXTIF:
                 tlvObject->EnableCWMP = gwTlvsLocalDB.tlv2.EnableCWMP;
+                if(isTr069Started)
+                {
+                    snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues Device.ManagementServer.EnableCWMP bool  %d &",tlvObject->EnableCWMP);
+                    system(cmd);
+                    GWPROV_PRINT(" %s \n",cmd);
+                }
                 break;
             case GW_SUBTLV_TR069_URL_EXTIF:
                 rc =  memset_s(tlvObject->URL,sizeof(tlvObject->URL), 0, sizeof(tlvObject->URL));
@@ -509,58 +561,292 @@ static bool WriteTr69TlvData(Uint8 typeOfTLV)
                     ERR_CHK(rc);
                     return FALSE;
                 }
+
+                // Check if ACS URL was received or not
+                if(tlvObject->URL)
+                {
+                    // Print it to a file
+                    fp_acs = fopen(TLV_ACS_URL_FILE, "w+");
+                    if (fp_acs)
+                    {
+                    	fprintf(fp_acs, "%s", tlvObject->URL);
+                    	fclose(fp_acs);
+                    }
+                    else
+                    {
+                        fprintf(stderr, "\nERROR: %s- fopen couldn't open file %s\n", __FUNCTION__, TLV_ACS_URL_FILE);
+                    }
+                }
+                // Set dmcli if Tr069 is started
+                if(isTr069Started)
+                {
+                    snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues Device.ManagementServer.URL string %s &",tlvObject->URL);
+                    system(cmd);
+                    GWPROV_PRINT(" %s \n",cmd);
+                }
+
                 break;
             case GW_SUBTLV_TR069_USERNAME_EXTIF:
+                strcpy(tlvObject->Username,gwTlvsLocalDB.tlv2.Username);
+
+                // Set dmcli if Tr069 is started
+                if(isTr069Started)
+                {
+                    sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Username string %s &",tlvObject->Username);
+                    system(cmd);
+                }
+                break;
             case GW_SUBTLV_TR069_PASSWORD_EXTIF:
+                strcpy(tlvObject->Password,gwTlvsLocalDB.tlv2.Password);
+
+                // Set dmcli if Tr069 is started
+                if(isTr069Started)
+                {
+                    sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Password string %s &",tlvObject->Password);
+                    system(cmd);
+                }
+                break;
             case GW_SUBTLV_TR069_CONNREQ_USERNAME_EXTIF:
+                strcpy(tlvObject->ConnectionRequestUsername,gwTlvsLocalDB.tlv2.ConnectionRequestUsername);
+
+                // Set dmcli if Tr069 is started
+                if(isTr069Started)
+                {
+                    sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestUsername string %s &",tlvObject->ConnectionRequestUsername);
+                    system(cmd);
+                }
+                break;
             case GW_SUBTLV_TR069_CONNREQ_PASSWORD_EXTIF:
+                strcpy(tlvObject->ConnectionRequestPassword,gwTlvsLocalDB.tlv2.ConnectionRequestPassword);
+
+                // Set dmcli if Tr069 is started
+                if(isTr069Started)
+                {
+                    sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestPassword string %s &",tlvObject->ConnectionRequestPassword);
+                    system(cmd);
+                }
                 break;
             case GW_SUBTLV_TR069_ACS_OVERRIDE_EXTIF:
                 tlvObject->AcsOverRide = gwTlvsLocalDB.tlv2.ACSOverride;
+
+                if(isTr069Started)
+                {
+                    sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ACSOverride bool  %d &",tlvObject->AcsOverRide);
+                    system(cmd);
+                }
                 break;
             default:
                 //(DUPLICATE)GWPROV_PRINTOut("TLV : %d can't be saved to TLV data file\n",typeOfTLV);
                 GWPROV_PRINT(" TLV : %d can't be saved to TLV data file\n",typeOfTLV);
+                printf("TLV : %d can't be saved to TLV data file\n",typeOfTLV);
                 break;
 		}
 	
 	}
 	else
 	{
+		int bACSChangedURL = 0;
 		/*In case of Normal bootup*/
 		GWPROV_PRINT(" Normal Bootup \n");
 		tlvObject->FreshBootUp = FALSE;
+
+		/* If the the URL is not set in the TLV 202 cfg file recieved or if URL field is NOT recieved at
+		 * all, FLUSH stale ACS URL value. Initialize it to a empty string. This is done so as to
+		 * comply with eRouter spec- If the TR-069 Management Server URL is present neither the CM config
+		 * file nor the DHCP Offer/Response, the eRouter MUST NOT communicate with any ACS.
+		 */
+		if ( (tlvObject->Tr69Enable == FALSE) && (gwTlvsLocalDB.tlv2.URL == NULL || gwTlvsLocalDB.tlv2.URL[0]=='\0') )
+		{
+			memset(tlvObject->URL, '\0', sizeof(tlvObject->URL));
+			/* Set dmcli if Tr069 is started and dmcli values are initialized. Flush stale values that
+			 * may be picked up by the dmcli from the old TLVData.bin file in nvram
+			 */
+			if(isTr069Started)
+			{
+				snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues Device.ManagementServer.URL string %s &", tlvObject->URL);
+				system(cmd);
+			}
+		}
+
+		bACSChangedURL = isACSChangedURL();
+
 		switch (typeOfTLV)
 		{
             case GW_SUBTLV_TR069_ENABLE_CWMP_EXTIF:
                 tlvObject->EnableCWMP = gwTlvsLocalDB.tlv2.EnableCWMP;
+                if(isTr069Started)
+                {
+                    snprintf(cmd, sizeof(cmd),"dmcli eRT setvalues Device.ManagementServer.EnableCWMP bool  %d &",tlvObject->EnableCWMP);
+                    system(cmd);
+                    GWPROV_PRINT(" %s \n",cmd);
+                }
                 break;
             case GW_SUBTLV_TR069_URL_EXTIF:
-                if(tlvObject->Tr69Enable == FALSE)
+                if((tlvObject->Tr69Enable == FALSE) || (gwTlvsLocalDB.tlv2.ACSOverride == 1) || (bACSChangedURL == 0))
                 {
-                    // This is to make sure that we always use boot config supplied URL
-                    // during TR69 initialization
-                    rc =  memset_s(tlvObject->URL,sizeof(tlvObject->URL), 0, sizeof(tlvObject->URL));
-                    ERR_CHK(rc);
-                    rc = strcpy_s(tlvObject->URL,sizeof(tlvObject->URL),gwTlvsLocalDB.tlv2.URL);
-                    if(rc != EOK)
+                    // Check if ACS URL was received or not
+                    if(gwTlvsLocalDB.tlv2.URL)
                     {
+                        // This is to make sure that we always use boot config supplied URL
+                        // during TR69 initialization
+                        rc =  memset_s(tlvObject->URL,sizeof(tlvObject->URL), 0, sizeof(tlvObject->URL));
                         ERR_CHK(rc);
-                        return FALSE;
+                        rc = strcpy_s(tlvObject->URL,sizeof(tlvObject->URL),gwTlvsLocalDB.tlv2.URL);
+                        if(rc != EOK)
+                        {
+                            ERR_CHK(rc);
+                            return FALSE;
+                        }
+                        // Print it to a file
+                        fp_acs = fopen(TLV_ACS_URL_FILE, "w+");
+                        if (fp_acs)
+                        {
+                            fprintf(fp_acs, "%s", tlvObject->URL);
+                            fclose(fp_acs);
+                        }
+                        else
+                        {
+                            fprintf(stderr, "\nERROR: %s- fopen couldn't open file %s\n", __FUNCTION__, TLV_ACS_URL_FILE);
+                        }
+                    }
+                    else
+                    {
+                        fprintf(stderr, "\nERROR: %s- Failed to fetch ACS URL from the TLV202 cfg file\n", __FUNCTION__);
+                    }
+                    // Set dmcli if Tr069 is started
+                    if(isTr069Started)
+                    {
+                        snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues Device.ManagementServer.URL string %s &",tlvObject->URL);
+                        system(cmd);
+                        GWPROV_PRINT(" %s \n",cmd);
                     }
                 }
                 break;
             case GW_SUBTLV_TR069_USERNAME_EXTIF:
+                if((tlvObject->Tr69Enable == FALSE) || (gwTlvsLocalDB.tlv2.ACSOverride == 1))
+                {
+                    strcpy(tlvObject->Username,gwTlvsLocalDB.tlv2.Username);
+
+                    // Set dmcli if Tr069 is started
+                    if(isTr069Started)
+                    {
+                        sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Username string %s &",tlvObject->Username);
+                        system(cmd);
+                    }
+                }
+                break;
             case GW_SUBTLV_TR069_PASSWORD_EXTIF:
+                if((tlvObject->Tr69Enable == FALSE) || (gwTlvsLocalDB.tlv2.ACSOverride == 1))
+                {
+                    strcpy(tlvObject->Password,gwTlvsLocalDB.tlv2.Password);
+
+                    // Set dmcli if Tr069 is started
+                    if(isTr069Started)
+                    {
+                        sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Password string %s &",tlvObject->Password);
+                        system(cmd);
+                    }
+                }
+                break;
             case GW_SUBTLV_TR069_CONNREQ_USERNAME_EXTIF:
+                if((tlvObject->Tr69Enable == FALSE) || (gwTlvsLocalDB.tlv2.ACSOverride == 1))
+                {
+                    strcpy(tlvObject->ConnectionRequestUsername,gwTlvsLocalDB.tlv2.ConnectionRequestUsername);
+
+                    // Set dmcli if Tr069 is started
+                    if(isTr069Started)
+                    {
+                        sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestUsername string %s &",tlvObject->ConnectionRequestUsername);
+                        system(cmd);
+                    }
+                }
+                break;
             case GW_SUBTLV_TR069_CONNREQ_PASSWORD_EXTIF:
+                if((tlvObject->Tr69Enable == FALSE) || (gwTlvsLocalDB.tlv2.ACSOverride == 1))
+                {
+                    strcpy(tlvObject->ConnectionRequestPassword,gwTlvsLocalDB.tlv2.ConnectionRequestPassword);
+
+                    // Set dmcli if Tr069 is started
+                    if(isTr069Started)
+                    {
+                        sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestPassword string %s &",tlvObject->ConnectionRequestPassword);
+                        system(cmd);
+                    }
+                }
                 break;
             case GW_SUBTLV_TR069_ACS_OVERRIDE_EXTIF:
                 tlvObject->AcsOverRide = gwTlvsLocalDB.tlv2.ACSOverride;
+                if (tlvObject->AcsOverRide == 1)
+                {
+                    if (gwTlvsLocalDB.tlv2_flags.URL_modified)
+                    {
+                        strcpy(tlvObject->URL,gwTlvsLocalDB.tlv2.URL);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.URL string %s &",tlvObject->URL);
+                            system(cmd);
+                        }
+                    }
+                    if (gwTlvsLocalDB.tlv2_flags.Username_modified)
+                    {
+                        strcpy(tlvObject->Username,gwTlvsLocalDB.tlv2.Username);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Username string %s &",tlvObject->Username);
+                            system(cmd);
+                        }
+                    }
+                    if (gwTlvsLocalDB.tlv2_flags.Password_modified)
+                    {
+                        strcpy(tlvObject->Password,gwTlvsLocalDB.tlv2.Password);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.Password string %s &",tlvObject->Password);
+                            system(cmd);
+                        }
+                    }
+                    if (gwTlvsLocalDB.tlv2_flags.ConnectionRequestUsername_modified)
+                    {
+                        strcpy(tlvObject->ConnectionRequestUsername,gwTlvsLocalDB.tlv2.ConnectionRequestUsername);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestUsername string %s &",tlvObject->ConnectionRequestUsername);
+                            system(cmd);
+                        }
+                    }
+                    if (gwTlvsLocalDB.tlv2_flags.ConnectionRequestPassword_modified)
+                    {
+                        strcpy(tlvObject->ConnectionRequestPassword,gwTlvsLocalDB.tlv2.ConnectionRequestPassword);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.ConnectionRequestPassword string %s &",tlvObject->ConnectionRequestPassword);
+                            system(cmd);
+                        }
+                    }
+                }
+                else
+                {
+                    if (gwTlvsLocalDB.tlv2_flags.URL_modified && (bACSChangedURL == 0))
+                    {
+                        strcpy(tlvObject->URL,gwTlvsLocalDB.tlv2.URL);
+                        // Set dmcli if Tr069 is started
+                        if(isTr069Started)
+                        {
+                            sprintf(cmd, "dmcli eRT setvalues Device.ManagementServer.URL string %s &",tlvObject->URL);
+                            system(cmd);
+                        }
+                    }
+                }
                 break;
             default:
                 //(DUPLICATE)GWPROV_PRINTOut("TLV : %d can't be saved to TLV data file\n",typeOfTLV);
                 GWPROV_PRINT(" TLV : %d can't be saved to TLV data file\n",typeOfTLV);
+                printf("TLV : %d can't be saved to TLV data file\n",typeOfTLV);
                 break;
 		}
 	}
@@ -948,7 +1234,7 @@ static TlvParseCallbackStatusExtIf_e GW_setTopologyMode(Uint8 type, Uint16 lengt
  *  \brief Get Syscfg Integer Value
  *  \return int/-1
  **************************************************************************/
-static int GWP_SysCfgGetInt(const char *name)
+int GWP_SysCfgGetInt(const char *name)
 {
    char out_value[20];
    int outbufsz = sizeof(out_value);
@@ -1002,21 +1288,21 @@ static STATUS GWP_UpdateEsafeAdminMode(DOCSIS_Esafe_Db_extIf_e enableMode)
 }
 
 /**************************************************************************/
-/*! \fn Bool GWP_IsGwEnabled(void)
+/*! \fn bool GWP_IsGwEnabled(void)
  **************************************************************************
  *  \brief Is gw enabled
- *  \return True/False
+ *  \return true/false
 **************************************************************************/
-static Bool GWP_IsGwEnabled(void)
+static bool GWP_IsGwEnabled(void)
 {
     
     if (eRouterMode == DOCESAFE_ENABLE_DISABLE_extIf)
     {
-        return False;
+        return false;
     }
     else
     {
-        return True;
+        return true;
     }
 }
 #endif
@@ -1080,9 +1366,9 @@ static void GWP_DocsisInited(void)
 	
      /* Add paths */
      
-     eSafeDevice_AddeRouterPhysicalNetworkInterface(IFNAME_ETH_0, True);
+     eSafeDevice_AddeRouterPhysicalNetworkInterface(IFNAME_ETH_0, true);
            
-     eSafeDevice_AddeRouterPhysicalNetworkInterface("usb0",True);
+     eSafeDevice_AddeRouterPhysicalNetworkInterface("usb0", true);
 
 #if !defined(INTEL_PUMA7)
     /* Register on more events */
@@ -1265,12 +1551,14 @@ char MocaStatus[16] = {0};
  *  \brief Actions when ERouter Mode is Changed
  *  \return None
 **************************************************************************/
-static void GWP_UpdateERouterMode(void)
+void GWP_UpdateERouterMode(void)
 {
     // This function is called when TLV202 is received with a valid Router Mode
     // It could trigger a mode switch but user can still override it...
     printf("%s: %d->%d\n", __func__, oldRouterMode, eRouterMode);
     GWPROV_PRINT(" %s: %d->%d\n", __func__, oldRouterMode, eRouterMode);
+    int retCode = 0;
+    int timeout = 0;
     if (oldRouterMode != eRouterMode)
     {
         
@@ -1289,6 +1577,33 @@ static void GWP_UpdateERouterMode(void)
             /*Enter bridge mode, DSLite won't be triggered to start, so we need to clear the previous DSLite service buffered status*/
             system("service_dslite clear &");
 #endif
+
+            // LGI ADD START
+            while (1)
+            {
+                retCode = system("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset |grep value");
+
+                if ((retCode  == 0))
+                {
+                    GWPROV_PRINT("The WiFiComp is ready to set bridge_mode after %d\n", timeout);
+                    printf("The WiFiComp is ready to set bridge_mode after %d\n", timeout);
+                    break;
+                }
+                else
+                {
+                    timeout++;
+                    if (timeout >= 60)
+                    {
+                        GWPROV_PRINT("The WiFiComp is not ready to set bridge_mode\n");
+                        printf("The WiFiComp is not ready to set bridge_mode\n");
+                        timeout = 0;
+                        break;
+                    }
+                    sleep(1);
+                }
+            }
+            // LGI ADD END
+
             system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static");
             
             GWP_DisableERouter();
@@ -1303,6 +1618,7 @@ static void GWP_UpdateERouterMode(void)
             GWP_SysCfgSetInt("last_erouter_mode", eRouterMode);  // save the new mode only
              if (syscfg_commit() != 0) 
                     printf("syscfg_commit failed for DOCESAFE_ENABLE_DISABLE_extIf \n");
+
             // TLV202 allows eRouter, but we still need to check user's preference
             //bridge_mode = GWP_SysCfgGetInt("bridge_mode");
             //if (bridge_mode == 1 || bridge_mode == 2)
@@ -1698,6 +2014,7 @@ static void *GWP_sysevent_threadfunc(void *data)
     async_id_t erouter_mode_asyncid;
     async_id_t ipv4_status_asyncid;
     async_id_t ipv6_status_asyncid;
+    async_id_t cmcfg_apply_asyncid; //LGI ADD
     async_id_t system_restart_asyncid;
     async_id_t snmp_subagent_status_asyncid;
     async_id_t primary_lan_l3net_asyncid;
@@ -1724,6 +2041,7 @@ static void *GWP_sysevent_threadfunc(void *data)
     sysevent_setnotification(sysevent_fd, sysevent_token, "erouter_mode", &erouter_mode_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "ipv4-status",  &ipv4_status_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "ipv6-status",  &ipv6_status_asyncid);
+    sysevent_setnotification(sysevent_fd, sysevent_token, "cfgfile_apply", &cmcfg_apply_asyncid); //LGI ADD
     sysevent_setnotification(sysevent_fd, sysevent_token, "system-restart",  &system_restart_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "snmp_subagent-status",  &snmp_subagent_status_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "primary_lan_l3net",  &primary_lan_l3net_asyncid);
@@ -1836,6 +2154,15 @@ static void *GWP_sysevent_threadfunc(void *data)
                 {
                     eRouterMode = DOCESAFE_ENABLE_DISABLE_extIf;
                 }
+                //LGI ADD START
+                char logbuf[256];
+                char oldmode[32] = {0};
+                char newmode[32] = {0};
+                GW_TranslateGWmode2String(oldRouterMode, oldmode);
+                GW_TranslateGWmode2String(eRouterMode, newmode);
+                snprintf(logbuf, sizeof(logbuf), "Reboot on change of device mode, from %s to %s", oldmode, newmode);
+                sleep(5);
+                //LGI ADD END
 
                 GWP_UpdateERouterMode();
                 sleep(5);
@@ -2053,6 +2380,16 @@ static void *GWP_sysevent_threadfunc(void *data)
                         sysevent_get(sysevent_fd_gs, sysevent_token_gs, "homesecurity_lan_l3net", buf, sizeof(buf));
                         if (buf[0] != '\0') sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", buf, 0);
 #endif
+                        // LGI ADD - START - for multinet
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET4_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET5_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET6_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET7_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET8_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET9_INSTANCE, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET10_INSTANCE, 0);
+                        // LGI ADD - END
                     }
 #ifdef MULTILAN_FEATURE
         sysevent_get(sysevent_fd_gs, sysevent_token_gs, "primary_lan_l3net", brlan0_inst, sizeof(brlan0_inst));
@@ -2075,16 +2412,6 @@ static void *GWP_sysevent_threadfunc(void *data)
         }
 #endif
                    
-                    if (!hotspot_started) {
-#if defined(INTEL_PUMA7) || defined(_COSA_BCM_MIPS_) || defined(_COSA_BCM_ARM_) ||  defined(_COSA_INTEL_XB3_ARM_)
-                        printf("Not Calling hotspot-start for XB3,XB6 and CBR it will be done in \
-				cosa_start_rem.sh,hotspot.service and xfinity_hotspot_bridge_setup.sh respectively\n");
-#else
-                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-start", "", 0);
-                        hotspot_started = 1 ;
-#endif
-                    } 
-                    
                     if (factory_mode && lan_telnet_started == 0) {
                         system("/usr/sbin/telnetd -l /usr/sbin/cli -i brlan0");
                         lan_telnet_started=1;
@@ -2100,6 +2427,22 @@ static void *GWP_sysevent_threadfunc(void *data)
 						check_lan_wan_ready();
 					}
 		    bridgeModeInBootup = 0; // reset after lan/bridge status is received.
+
+                    //LGI ADD START
+                    /*The bridge mode is started. We don't know if the link up event will come or not.
+                    If the RF is disconnected all the time, no link up event and of cause no link down event.
+                    So start the bridge mode DHCP server at first.*/
+                    if(strcmp(name, "bridge-status")==0)
+                    {
+                        char status[16] = {0};
+                        sysevent_get(sysevent_fd_gs, sysevent_token_gs, "wan-status", status, sizeof(status));
+                        if(strcmp(status, "started"))
+                        {
+                            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-bridge-mode-start", "", 0);
+                        }
+                        system("/etc/utopia/port_bridging.sh restart &");
+                    }
+                    //LGI ADD END
                 }
             } else if (ret_value == DHCPV6_CLIENT_V6ADDR) {
                 Uint8 v6addr[ NETUTILS_IPv6_GLOBAL_ADDR_LEN / sizeof(Uint8) ] = {0};
@@ -2139,6 +2482,14 @@ static void *GWP_sysevent_threadfunc(void *data)
                     system("service_dslite restart &");
                 }
 #endif
+
+#if defined(INTEL_PUMA7)
+                eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
+                /*If the GW is IPv6 only mode, start the hotspot only after the IPv6 address ready*/
+                if (eRouterMode==2) {
+                    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
+                }
+#endif
             }
 			else if (ret_value == WAN_STATUS) {
                                 rc = strcmp_s("started", strlen("started"),val, &ind);
@@ -2148,7 +2499,36 @@ static void *GWP_sysevent_threadfunc(void *data)
                                     if (!once) {
 						check_lan_wan_ready();
 					}
+// LGI ADD - START
+#if defined(INTEL_PUMA7)
+                    eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
+                    /*If the GW is IPv4 only mode or Dual-Stack mode, try to start the hotspot after the IPv4 WAN ready.
+                    Explanation for the special cases on dual stack mode:
+                    1) If both IPv4 and IPv6 adress can be got, start the hotspot here after IPv4 WAN ready
+                    2) If IPv4 address can be got but IPv6 address not able to get, wait for at most 30s for IPv6 address and then
+                    start the hotspot
+                    3) If IPv4 address not able to get, the IPv6 address won't be got(because the DHCPv6 client starts only after the IPv4 WAN ready)
+                    that means gw won't work if without IPv4 address, no need to start the hotspot at this case.*/
+                    if (eRouterMode==1) {
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
+                    }
+                    else if(eRouterMode==3)
+                    {
+                        /*Create a thread to wait for the IPv6 address ready, at most wait for 30s if no IPv6 address got*/
+                        pthread_create(&sysevent_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
+                    }
+#endif
+// LGI ADD - END
+                    system("/etc/utopia/port_bridging.sh restart &");
+
                                  }
+
+                // LGI ADD BEGIN
+                else if (!strcmp(val, "stopped"))
+                { // if WAN down, the zebra need to re-launch to take this change for RA adapting
+                    system("service_routed radv-restart");
+                }
+                // LGI ADD END
 			}
 			else if (ret_value == IPV6_PREFIX && strlen(val) > 5) {
 				if (!once) {
@@ -2182,6 +2562,12 @@ static void *GWP_sysevent_threadfunc(void *data)
                 }
             }
 #endif
+            //LGI ADD START
+            else if (ret_value == CFGFILE_APPLY)
+            {
+                RestartServicesPerMask();
+            }
+            //LGI ADD END
         }
     }
     return 0;
@@ -2234,7 +2620,19 @@ static int GWP_act_DocsisLinkDown_callback_2()
    #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
        system("sysevent set dhcpv6_client-stop");
    #endif
+       // LGI ADD - START
+       // dhcp server restart event will regenerate dnsmasq.conf file and restart dnsmasq service.
+       // DHCP options (lease time, troubleshoot_wizard changes) add into dnsmasq.conf file depends on wan_status.
+       sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-restart", "1", 0);
+       // LGI ADD - END
     }
+
+    //LGI ADD START
+    if(bridge_mode != 0)//full-bridge or psudo-bridge
+    {
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-bridge-mode-start", "", 0);
+    }
+    //LGI ADD END
 
     return 0;
 }
@@ -2250,6 +2648,18 @@ static int GWP_act_DocsisLinkUp_callback()
     printf("\nsysevent set phylink_wan_state up\n");
     printf("\n**************************\n\n");
 
+    // LGI ADD BEGIN
+    system("/etc/atom/update_timezone.sh");
+    //if(bridge_mode != 0) //Not limit to bridge mode, since router mode might also start dhcp server (if last_erouter_mode=0)
+    {
+        char status[16] = {0};
+        sysevent_get(sysevent_fd_gs, sysevent_token_gs, "dhcp-server-bridge-mode-status", status, sizeof(status));
+        if(!strcmp(status, "started"))
+        {
+            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-bridge-mode-stop", "", 0);
+        }
+    }
+    //LGI ADD END
     
 #if defined(_PLATFORM_RASPBERRYPI_)
      char *temp;
@@ -2313,9 +2723,23 @@ static int GWP_act_DocsisLinkUp_callback()
     #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
 	sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcpv6_client-start", "", 0);
     #endif
+
+	//LGI ADD START
+	system("service_routed radv-restart");
+	//LGI ADD END
     }
 
 #endif
+    //LGI ADD START
+    char logbuf[256];
+
+    logbuf[0] = 0;
+    syscfg_get( NULL, "last_reset_reason", logbuf, sizeof(logbuf) );
+    if ( logbuf[0] != 0 )
+        printf("Inside IF logbuf of last_reset_reason");
+    syscfg_unset( NULL, "last_reset_reason" );
+    syscfg_commit();
+    //LGI ADD EN
     return 0;
 }
 
@@ -2593,20 +3017,29 @@ static void *GWP_UpdateTr069CfgThread( void *data )
  *  \param[in] SME Handler params
  *  \return 0
 **************************************************************************/
-static int GWP_act_DocsisCfgfile_callback(Char* cfgFile)
+static int GWP_act_DocsisCfgfile_callback(char* cfgFile)
 {
-    Char *cfgFileName = NULL;
+    char *cfgFileName = NULL;
     struct stat cfgFileStat;
     Uint8 *cfgFileBuff = NULL;
     Uint32 cfgFileBuffLen;
     int cfgFd;
     ssize_t actualNumBytes;
+    char cmdstr[256];
 	pthread_t Updatetr069CfgThread = (pthread_t)NULL;
 
     //TlvParseStatus_e tlvStatus;
-    TlvParsingStatusExtIf_e tlvStatus;
+    TlvParsingStatusExtIf_e tlvStatus = TLV_ILLEGAL_LEN_extIf;  //LGI MOD
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     
+    cfgFileRouterMode = -1; //LGI ADD, in case there is no TLV202.1 in cfg file
+    oldRouterMode = eRouterMode;     //LGI MOVED
+    //LGI ADD START
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "Started", 0);
+    snprintf(cmdstr, sizeof(cmdstr), "sysevent set %s %u", RESTART_MODULE, RESTART_NONE);
+    system(cmdstr);
+    //LGI ADD END
+
     if( cfgFile != NULL)
     {
       cfgFileName = cfgFile;
@@ -2667,7 +3100,6 @@ static int GWP_act_DocsisCfgfile_callback(Char* cfgFile)
         goto closeFile;
     }
 
-    oldRouterMode = eRouterMode;
 
     
     tlvStatus = parseTlv(cfgFileBuff, cfgFileBuffLen);
@@ -2687,12 +3119,10 @@ static int GWP_act_DocsisCfgfile_callback(Char* cfgFile)
     GWPROV_PRINT("GWP_UpdateTr069CfgThread started\n");
 	pthread_create( &Updatetr069CfgThread, NULL, &GWP_UpdateTr069CfgThread, NULL );  
 
-    GWP_UpdateERouterMode();
 
 #if defined (INTEL_PUMA7)
     //Intel Proposed RDKB Generic Bug Fix from XB6 SDK  
     //Notifying the CcspPandM and CcspTr069 module that the TLV parsing is successful and done
-    system("sysevent set TLV202-status success");
 #endif
 
 closeFile:
@@ -2709,6 +3139,18 @@ freeMem:
     }
 gimReply:
 
+    GWP_Update_ErouterMode_by_InitMode();    //LGI ADD
+    if (tlvStatus == TLV_OK_extIf)
+    {
+        //Notifying the CcspPandM and CcspTr069 module that the TLV parsing is successful and done
+        system("sysevent set TLV202-status success");
+    }
+    //LGI ADD START
+    else
+    {
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "End", 0);
+    }
+    //LGI ADD END
     /* Reply to GIM SRN */
     notificationReply_CfgFileForEsafe();
     
@@ -2726,7 +3168,7 @@ gimReply:
 //static int GWP_act_StartActiveUnprovisioned(SME_APP_T *app, SME_EVENT_T *event)
 static int GWP_act_StartActiveUnprovisioned()
 {
-    Char *cmdline;
+    char *cmdline;
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     /* Update esafe db with router provisioning status*/
     
@@ -2935,7 +3377,7 @@ static int GWP_act_DocsisInited_callback()
     /* Disconnect docsis LB */
     printf("Disconnecting DOCSIS local bridge\n");
         GWPROV_PRINT(" Disconnecting DOCSIS local bridge\n");
-    connectLocalBridge(False);
+    connectLocalBridge(false);
 
     /* This is an SRN, reply */
     printf("Got Docsis INIT - replying\n");
@@ -3352,6 +3794,8 @@ int main(int argc, char *argv[])
     	obj->pGWP_act_ProvEntry = GWP_act_ProvEntry_callback;
     	obj->pDocsis_gotEnable = docsis_gotEnable_callback;
     	obj->pGW_Tr069PaSubTLVParse = GW_Tr069PaSubTLVParse;
+    	obj->pGWP_act_ErouterSnmpInitModeSet = GWP_act_ErouterSnmpInitModeSet_callback; // LGI ADD
+    	obj->pGW_VendorSpecificSubTLVParse = GW_VendorSpecificSubTLVParse; // LGI ADD
 #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
     	obj->pGW_SetTopologyMode = GW_setTopologyMode;
 #endif
