@@ -88,6 +88,14 @@ typedef struct mac_addr
 
 #endif
 
+// LGI ADD Begin
+/* Vendor Specific (TLV 43) sub-TLVs Tree */
+#define GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT        12
+
+/* Data Model Object (TLV 43.12) related defines */
+#define GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT_MAX_LEN 256
+// LGI ADD End
+
 /*! \var typedef enum DOCSIS_Esafe_Db_extIf_e
     \brief Type of enable.
 *\n           Needs to be in sync with the enum defined for DOCSIS ESAFE DB.
@@ -135,6 +143,23 @@ typedef enum
 
     DOCESAFE_EROUTER_NUM_OPER_MODES_extIf,
 } esafeErouterOperModeExtIf_e;
+
+// LGI ADD Begin
+/*! \var typedef enum esafeErouterInitModeExtIf_e
+    \brief eRouter init mode
+*\n            The internal definitions match the MIB requirements.
+*\n            Needs to be in sync with the enum defined for DOCSIS ESAFE DB.
+*/
+typedef enum
+{
+    DOCESAFE_EROUTER_INIT_MODE_DISABLED_extIf   = 1,
+    DOCESAFE_EROUTER_INIT_MODE_IPV4_extIf       = 2,
+    DOCESAFE_EROUTER_INIT_MODE_IPV6_extIf       = 3,
+    DOCESAFE_EROUTER_INIT_MODE_IPV4_IPV6_extIf  = 4,
+    DOCESAFE_EROUTER_INIT_MODE_HONOR_ROUTER_INIT_extIf = 5,
+    DOCESAFE_EROUTER_NUM_INIT_MODES_extIf,
+} esafeErouterInitModeExtIf_e;
+// LGI ADD End
 
 /*! \enum esafeProvisioningStatusProgressExtIf_e
  *  \brief The current state of the eSAFE provisioning process
@@ -215,6 +240,8 @@ typedef void (*fpDocsisEnabled)(unsigned char);
 typedef void (*fpDocsisRATransInterval)(unsigned short);
 #endif
 typedef TlvParseCallbackStatusExtIf_e (*fpGW_Tr069PaSubTLVParse)(unsigned char type, unsigned short length, const unsigned char *value);
+typedef void (*fpErouterSnmpInitModeSet)();  // LGI ADD
+typedef void (*fpVendorSpecificSubTLVParse)(unsigned char type, unsigned short length, const unsigned char* value); // LGI ADD
 #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
 typedef void (*fpGW_SetTopologyMode)(unsigned char type, unsigned short length, const unsigned char *value);
 #endif
@@ -242,6 +269,8 @@ typedef struct __appCallBack
 #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
 	fpGW_SetTopologyMode pGW_SetTopologyMode;
 #endif
+	fpErouterSnmpInitModeSet pGWP_act_ErouterSnmpInitModeSet; // LGI ADD
+	fpVendorSpecificSubTLVParse pGW_VendorSpecificSubTLVParse; // LGI ADD
 }appCallBack;
 
  /*
