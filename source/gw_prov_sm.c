@@ -443,7 +443,6 @@ int IsFileExists(const char *fname)
 #define TR069PidFile "/var/tmp/CcspTr069PaSsp.pid"
 #define FALSE 0
 #define TRUE 1
-static char url[600] = {0};
 
 static bool WriteTr69TlvData(Uint8 typeOfTLV)
 {
@@ -508,12 +507,6 @@ static bool WriteTr69TlvData(Uint8 typeOfTLV)
                         if(rc != EOK)
                         { 
 	                        ERR_CHK(rc);
-                            return FALSE;
-                        }
-				        rc = strcpy_s(url,sizeof(url),tlvObject->URL);
-                        if(rc != EOK)
-                        {
-                            ERR_CHK(rc);
                             return FALSE;
                         }
                 		break;
