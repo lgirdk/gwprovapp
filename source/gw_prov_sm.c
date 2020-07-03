@@ -943,56 +943,6 @@ static STATUS GW_UpdateTr069Cfg(void)
     }
 
     return ret;
-  
-  
-
-#if 0
-        SnmpaIfResponse_t *tlv11Resp = (SnmpaIfResponse_t*)malloc(sizeof(SnmpaIfResponse_t)+sizeof(int));
-        if (!tlv11Resp)
-        {
-            LOG_GW_ERROR("Failed to allocate dynamic memory");
-            goto label_nok;
-        }
-        rc =  memset_s(tlv11Resp,sizeof(SnmpaIfResponse_t)+sizeof(int), 0, sizeof(SnmpaIfResponse_t)+sizeof(int));
-        ERR_CHK(rc);
-        /* Set TLV11 whitin whole config file and TLV11 duplication test */
-        ret = (STATUS)SNMPAIF_SetTLV11Config(SNMP_AGENT_CTRL_SOCK, (void *)Snmp_Tlv11Buf, (int)Snmp_Tlv11BufLen, tlv11Resp);
-
-        if(tlv11Resp->len >= sizeof(int))
-        {
-            int errorCode = 0;
-
-	    /*
-             * Copy the error code
-             */
-	    errorCode = (int) *(tlv11Resp->value);
-
-            /*Need to send the required event*/
-            // ReportTlv11Events(errorCode);
-
-            LOG_GW_ERROR("Failed to set TLV11 parameters - error code = %d", errorCode);
-            // fprintf(stderr, "<RT> %s - Failed to set TLV11 parameters - error code = %d\n", __FUNCTION__, errorCode);
-        }
-   
-        if(ret != STATUS_OK)
-        {
-#if (SA_CUSTOM)
-            LOG_GW_ERROR("TLV11 internal SNMP set failed! IGNORING...");
-#else //TI Org
-            LOG_GW_ERROR("TLV11 internal SNMP set failed!");
-            if(tlv11Resp) free(tlv11Resp);
-            goto label_nok;
-#endif
-        }
-
-        if(tlv11Resp) free(tlv11Resp);
-    }
-
-    return STATUS_OK;
-
-label_nok:
-    return STATUS_NOK;
-#endif 
 }
 #endif
 #endif
