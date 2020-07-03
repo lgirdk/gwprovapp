@@ -956,15 +956,9 @@ static STATUS GW_UpdateTr069Cfg(void)
         if(tlv11Resp->len >= sizeof(int))
         {
             Int32 errorCode = 0;
-
-	    /*
-             * Copy the error code
-             */
-	    errorCode = (int) *(tlv11Resp->value);
-
+            memcpy(&errorCode, tlv11Resp->value, sizeof(int));
             /*Need to send the required event*/
             // ReportTlv11Events(errorCode);
-
             LOG_GW_ERROR("Failed to set TLV11 parameters - error code = %d", errorCode);
             // fprintf(stderr, "<RT> %s - Failed to set TLV11 parameters - error code = %d\n", __FUNCTION__, errorCode);
         }
