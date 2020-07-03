@@ -58,6 +58,7 @@ extern token_t sysevent_token_gs;
 extern int cfgFileRouterMode;
 
 int Restart_Services(char *restart_module);
+int RestartServicesPerMask(void);
 void GW_TranslateGWmode2String( int gwmode, char *modestring );
 void GWP_UpdateERouterMode(void);
 int GWP_SysCfgGetInt(const char *name);
@@ -65,7 +66,7 @@ void translateErouterSnmpInitModeToOperMode(esafeErouterInitModeExtIf_e initMode
 void *GWP_start_hotspot_threadfunc(void *data);
 void GWP_Update_ErouterMode_by_InitMode(void);
 int GWP_act_ErouterSnmpInitModeSet_callback();
-TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(Uint8 type, Uint16 length, const Uint8* value);
+TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(unsigned char type, unsigned short length, const unsigned char* value);
 void Send_Release(char *file_name);
 
 #endif
