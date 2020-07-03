@@ -15,8 +15,14 @@
  **********************************************************************/
 
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <string.h>
+#include <pthread.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
 
@@ -27,12 +33,12 @@ int cfgFileRouterMode = -1;
 #define MAX_ARGS 20
 #define MAX_LINE_SIZE 512
 #define MAX_LEN 16
-#define DHCPV4_PID_FILE  "/var/run/eRT_ti_udhcpc.pid"
+#define DHCPV4_PID_FILE "/var/run/eRT_ti_udhcpc.pid"
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
 
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
-static Bool gbDmObjectParseCfgDone = False;
+static bool gbDmObjectParseCfgDone = false;
 static int DmObjectSockFds[2];
 
 static int SaveRestartMask(unsigned long mask)
@@ -108,14 +114,7 @@ void GW_TranslateGWmode2String( int gwmode, char *modestring )
     return;
 }
 
-/* Executes a process and store its output in a buffer.
-   Buffer needs to be freed by caller. */
-int run_cmd(const char *caller, char *cmd, char **retBuf)
-{
-    return run_cmd_timeout(caller, cmd, retBuf, 100); // 5 second timeout (100 * 50ms)
-}
-
-int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int count)
+static int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int count)
 {
     int fd[2];
     pid_t cpid;
@@ -279,6 +278,13 @@ int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int count)
     return -1;
 }
 
+/* Executes a process and store its output in a buffer.
+   Buffer needs to be freed by caller. */
+static int run_cmd(const char *caller, char *cmd, char **retBuf)
+{
+    return run_cmd_timeout(caller, cmd, retBuf, 100); // 5 second timeout (100 * 50ms)
+}
+
 void *GWP_start_hotspot_threadfunc(void *data)
 {
     int timeout = 30;
@@ -440,14 +446,14 @@ static const char *GW_MapTr69TypeToDmcliType(const char *tr69Type)
 }
 
 /**************************************************************************/
-/*! \fn Bool GW_CheckForErrorStr(FILE *pFile, char *errorStr);
+/*! \fn bool GW_CheckForErrorStr(FILE *pFile, char *errorStr);
  **************************************************************************
  *  \brief Check for specified error in a result file
  *  \param[in] pFile - File to read result data from
  *  \param[in] errorStr - Error string to look for
- *  \return True - errorStr was found, False - errorStr was not found
+ *  \return true - errorStr was found, false - errorStr was not found
  **************************************************************************/
-static Bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
+static bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
 {
     char buf[256] = {0};
     while (fgets(buf, sizeof(buf) - 1, pFile) != NULL)
@@ -455,37 +461,37 @@ static Bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
         if (strstr(buf, errorStr) != NULL)
         {
             // error found
-            return True;
+            return true;
         }
     }
-    return False;
+    return false;
 }
 
 /**************************************************************************/
-/*! \fn Bool GW_SetParam(char *pName, char *pType, char *pValue);
+/*! \fn bool GW_SetParam(char *pName, char *pType, char *pValue);
  **************************************************************************
  *  \brief Set DataModel parameter
  *  \param[in] pName - Parameter Name
  *  \param[in] pType - Parameter Type (dmcli type string)
  *  \param[in] pValue - Parameter Value
- *  \return True - Parameter was found and set, false - Parameter not found
+ *  \return true - Parameter was found and set, false - Parameter not found
  **************************************************************************/
-static Bool GW_SetParam(const char *pName, const char *pType, const char *pValue)
+static bool GW_SetParam(const char *pName, const char *pType, const char *pValue)
 {
-    Bool success = False;
+    bool success = false;
     char cmd[1024] = {0};
     char errorStr[] = "Can't find destination component";
     FILE *result = NULL;
 
     if (pName == NULL || pType == NULL || pValue == NULL)
     {
-        return False;
+        return false;
     }
 
     /* Skip WiFi Apply TLV */
     if ( strstr(pName, DEVICE_WIFI) != NULL && strstr(pName, DEVICE_WIFI_APPLY) != NULL )
     {
-        return True;
+        return true;
     }
 
     /* Call dmcli to apply the parameter. This really needs to be reworked to use d-bus
@@ -551,12 +557,12 @@ void GW_DmObjectListAdd(DmObject_t *pDmObj)
 }
 
 /**************************************************************************/
-/*! \fn Bool GW_DmObjectListIsEmpty(void);
+/*! \fn bool GW_DmObjectListIsEmpty(void);
  **************************************************************************
  *  \brief Determines if DataModel list is empty
- *  \return Bool - True if the list is empty
+ *  \return bool - true if the list is empty
  **************************************************************************/
-Bool GW_DmObjectListIsEmpty(void)
+bool GW_DmObjectListIsEmpty(void)
 {
     return (gpDmObjectHead == NULL);
 }
@@ -571,7 +577,7 @@ Bool GW_DmObjectListIsEmpty(void)
  **************************************************************************/
 void GW_DmObjectListApply(void)
 {
-    Bool success = False;
+    bool success = false;
     DmObject_t *pPrev = NULL;
     DmObject_t *pCurr = gpDmObjectHead;
 
@@ -690,7 +696,7 @@ static bool check_alias(char * cmd_output, char * alias)
  **************************************************************************/
 static bool is_customer_data_model()
 {
-    char* sysbuf[8] = {0};
+    char sysbuf[8] = {0};
 
     syscfg_init();
 
@@ -741,7 +747,7 @@ static char* get_customer_data_model_file_name()
     }
 }
 /**************************************************************************/
-/*! \fn Bool GW_DmObjectThread(void *pParam);
+/*! \fn bool GW_DmObjectThread(void *pParam);
  **************************************************************************
  *  \brief Worker thread to process VendorSpecific Sub TLVs (TLV202.43.x)
  *  \param[in] pParam - unused
@@ -795,7 +801,7 @@ static void *GW_DmObjectThread(void *pParam)
                just set the config done flag */
             if (!strcmp(tlvData, TLV2024312_CONFIG_DONE))
             {
-                gbDmObjectParseCfgDone = True;
+                gbDmObjectParseCfgDone = true;
             }
             else
             {
@@ -918,7 +924,7 @@ static void *GW_DmObjectThread(void *pParam)
         {
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "End", 0);
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_apply", "", 0);
-            gbDmObjectParseCfgDone = False;
+            gbDmObjectParseCfgDone = false;
         }
     }
 
@@ -926,7 +932,7 @@ static void *GW_DmObjectThread(void *pParam)
 }
 
 /**************************************************************************/
-/*! \fn TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(Uint8 type, Uint16 length, const Uint8* value);
+/*! \fn TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(unsigned char type, unsigned short length, const unsigned char* value);
  **************************************************************************
  *  \brief Process VendorSpecific Sub TLVs (TLV202.43.x)
  *  \param[in] type
@@ -934,9 +940,9 @@ static void *GW_DmObjectThread(void *pParam)
  *  \param[in] value
  *  \return 0
  **************************************************************************/
-TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(Uint8 type, Uint16 length, const Uint8* value)
+TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(unsigned char type, unsigned short length, const unsigned char* value)
 {
-    static Bool bDmObjectThreadStarted = False;
+    static bool bDmObjectThreadStarted = false;
 
     if (type != GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT)
     {
@@ -965,7 +971,7 @@ TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(Uint8 type, Uint16 le
             close(DmObjectSockFds[1]);
             return TLV_PARSE_CALLBACK_ABORT_EXTIF;
         }
-        bDmObjectThreadStarted = True;
+        bDmObjectThreadStarted = true;
     }
 
     /* send the TLV data to the worker thread */

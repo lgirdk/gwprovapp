@@ -1282,21 +1282,21 @@ static STATUS GWP_UpdateEsafeAdminMode(DOCSIS_Esafe_Db_extIf_e enableMode)
 }
 
 /**************************************************************************/
-/*! \fn Bool GWP_IsGwEnabled(void)
+/*! \fn bool GWP_IsGwEnabled(void)
  **************************************************************************
  *  \brief Is gw enabled
- *  \return True/False
+ *  \return true/false
 **************************************************************************/
-static Bool GWP_IsGwEnabled(void)
+static bool GWP_IsGwEnabled(void)
 {
     
     if (eRouterMode == DOCESAFE_ENABLE_DISABLE_extIf)
     {
-        return False;
+        return false;
     }
     else
     {
-        return True;
+        return true;
     }
 }
 #endif
@@ -1360,9 +1360,9 @@ static void GWP_DocsisInited(void)
 	
      /* Add paths */
      
-     eSafeDevice_AddeRouterPhysicalNetworkInterface(IFNAME_ETH_0, True);
+     eSafeDevice_AddeRouterPhysicalNetworkInterface(IFNAME_ETH_0, true);
            
-     eSafeDevice_AddeRouterPhysicalNetworkInterface("usb0",True);
+     eSafeDevice_AddeRouterPhysicalNetworkInterface("usb0", true);
 
 #if !defined(INTEL_PUMA7)
     /* Register on more events */
@@ -3025,9 +3025,9 @@ static void *GWP_UpdateTr069CfgThread( void *data )
  *  \param[in] SME Handler params
  *  \return 0
 **************************************************************************/
-static int GWP_act_DocsisCfgfile_callback(Char* cfgFile)
+static int GWP_act_DocsisCfgfile_callback(char* cfgFile)
 {
-    Char *cfgFileName = NULL;
+    char *cfgFileName = NULL;
     struct stat cfgFileStat;
     Uint8 *cfgFileBuff = NULL;
     Uint32 cfgFileBuffLen;
@@ -3176,7 +3176,7 @@ gimReply:
 //static int GWP_act_StartActiveUnprovisioned(SME_APP_T *app, SME_EVENT_T *event)
 static int GWP_act_StartActiveUnprovisioned()
 {
-    Char *cmdline;
+    char *cmdline;
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     /* Update esafe db with router provisioning status*/
     
@@ -3385,7 +3385,7 @@ static int GWP_act_DocsisInited_callback()
     /* Disconnect docsis LB */
     printf("Disconnecting DOCSIS local bridge\n");
         GWPROV_PRINT(" Disconnecting DOCSIS local bridge\n");
-    connectLocalBridge(False);
+    connectLocalBridge(false);
 
     /* This is an SRN, reply */
     printf("Got Docsis INIT - replying\n");
