@@ -1576,6 +1576,42 @@ char MocaStatus[16] = {0};
 }
 #endif
 
+static int GWP_IssueCmdWithTimeout (char *cmd, char *respStr, int timeout)
+{
+    char cmdBuf[256];
+    int retVal = 0;
+    int count = 0;
+
+    GWPROV_PRINT("%s: -E-\n", __FUNCTION__);
+
+    snprintf(cmdBuf, sizeof(cmdBuf), "%s | grep %s", cmd, respStr);
+
+    GWPROV_PRINT("%s: cmd=%s\n", __FUNCTION__, cmdBuf);
+
+    while (1)
+    {
+        if (system(cmdBuf) == 0)
+        {
+            GWPROV_PRINT("%s: Command success after %d Secs\n", __FUNCTION__, count);
+            retVal = 0;
+            break;
+        }
+
+        if (++count >= timeout)
+        {
+            GWPROV_PRINT("%s: Command fail after %d Secs\n", __FUNCTION__, count);
+            retVal = -1;
+            break;
+        }
+
+        sleep(1);
+    }
+
+    GWPROV_PRINT("%s: -X-\n", __FUNCTION__);
+
+    return retVal;
+}
+
 /**************************************************************************/
 /*! \fn void GWP_UpdateERouterMode(void)
  **************************************************************************
@@ -1610,33 +1646,11 @@ void GWP_UpdateERouterMode(void)
 #endif
 
             // LGI ADD START
-            while (1)
-            {
-                retCode = system("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset |grep value");
-
-                if ((retCode  == 0))
-                {
-                    GWPROV_PRINT("The WiFiComp is ready to set bridge_mode after %d\n", timeout);
-                    printf("The WiFiComp is ready to set bridge_mode after %d\n", timeout);
-                    break;
-                }
-                else
-                {
-                    timeout++;
-                    if (timeout >= 60)
-                    {
-                        GWPROV_PRINT("The WiFiComp is not ready to set bridge_mode\n");
-                        printf("The WiFiComp is not ready to set bridge_mode\n");
-                        timeout = 0;
-                        break;
-                    }
-                    sleep(1);
-                }
-            }
+            GWP_IssueCmdWithTimeout("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset", "value", 60);
             // LGI ADD END
 
-            v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static");
-            
+            GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
+
             GWP_DisableERouter();
             
             GWP_SysCfgSetInt("last_erouter_mode", eRouterMode);  // save the new mode only
@@ -1671,7 +1685,9 @@ void GWP_UpdateERouterMode(void)
                 webui_started = 0;
                 active_mode = BRMODE_ROUTER; //This is set so that the callback from LanMode does not trigger another transition.
                                                     //The code here will here will handle it.
-                v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router");
+
+                GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router", "succeed", 30);
+
                 GWP_EnableERouter();
             }
             else  // remain enabled, switch mode
