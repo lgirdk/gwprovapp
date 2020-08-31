@@ -2603,6 +2603,22 @@ static void *GWP_sysevent_threadfunc(void *data)
                 RestartServicesPerMask();
             }
             //LGI ADD END
+
+
+            char status[16] = {0};
+            char logbuf[2];
+            int dslite_enable;
+            eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
+            if(eRouterMode == DOCESAFE_ENABLE_IPv6_extIf)
+            {
+                sysevent_get(sysevent_fd_gs, sysevent_token_gs, "dslite_service-status", status, sizeof(status));
+                syscfg_get( NULL, "dslite_enable", logbuf, sizeof(logbuf) );
+                dslite_enable = atoi(logbuf);
+                if( strcmp(status, "started") && dslite_enable == 1)
+                {
+                    system("service_dslite start &");
+                }
+            }
         }
     }
     return 0;
