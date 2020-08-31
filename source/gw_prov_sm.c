@@ -190,10 +190,8 @@ typedef struct _GwTlvsLocalDB
 
 /* New implementation !*/
 
-#ifdef MULTILAN_FEATURE
 #define BRG_INST_SIZE 5
 #define BUF_SIZE 256
-#endif
 
 #if defined(INTEL_PUMA7)
 extern CLIENT* Cgm_GatewayApiProxy_Init(void);
@@ -1775,11 +1773,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 
     for (;;)
     {
-#ifdef MULTILAN_FEATURE
-        char name[25], val[42], buf[BUF_SIZE];
-#else
-        char name[25], val[42], buf[10];
-#endif
+        char name[64], val[64], buf[BUF_SIZE];
         int namelen = sizeof(name);
         int vallen  = sizeof(val);
         int err;
