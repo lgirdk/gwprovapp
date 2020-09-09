@@ -2605,8 +2605,8 @@ static void *GWP_sysevent_threadfunc(void *data)
             char status[16] = {0};
             char logbuf[2];
             int dslite_enable;
-            eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
-            if(eRouterMode == DOCESAFE_ENABLE_IPv6_extIf)
+
+            if (GWP_SysCfgGetInt("last_erouter_mode") == DOCESAFE_ENABLE_IPv6_extIf)
             {
                 sysevent_get(sysevent_fd_gs, sysevent_token_gs, "dslite_service-status", status, sizeof(status));
                 syscfg_get( NULL, "dslite_enable", logbuf, sizeof(logbuf) );
