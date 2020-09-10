@@ -20,25 +20,18 @@ AM_CFLAGS = -D_ANSC_LINUX
 AM_CFLAGS += -D_ANSC_USER
 AM_CFLAGS += -D_ANSC_LITTLE_ENDIAN_
 AM_CFLAGS += -DCONFIG_PRIMARY_NET_BRIDGE_MODE
-if PLATFORM_RASPBERRYPI_ENABLED
-AM_LDFLAGS = -lsysevent
-else
-AM_LDFLAGS = -lgwprovappabs
-AM_LDFLAGS += -lsysevent
-endif
-AM_LDFLAGS += -lsyscfg
-AM_LDFLAGS += -lulog
 
-AM_CPPFLAGS = -Wall -Werror
 ACLOCAL_AMFLAGS = -I m4
-hardware_platform = i686-linux-gnu
+
 bin_PROGRAMS = gw_prov_utopia
-gw_prov_utopia_CPPFLAGS = -I/var/tmp/pc-rdkb/include $(CPPFLAGS) -I$(srcdir)/include
+
+gw_prov_utopia_CPPFLAGS = -I$(srcdir)/include
 gw_prov_utopia_SOURCES = gw_prov_sm.c autowan.c
+
 if PLATFORM_RASPBERRYPI_ENABLED
 gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog
 else
-gw_prov_utopia_LDFLAGS =  -lgwprovappabs -lsysevent -lsyscfg -lulog -lsecure_wrapper
+gw_prov_utopia_LDFLAGS = -lgwprovappabs -lsysevent -lsyscfg -lulog -lsecure_wrapper
 endif
 gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/dbus-1.0 -I${PKG_CONFIG_SYSROOT_DIR}$(libdir)/dbus-1.0/include
 
