@@ -317,6 +317,8 @@ static GwTlvsLocalDB_t gwTlvsLocalDB;
 //Intel Proposed RDKB Generic Bug Fix from XB6 SDK
 static int sIPv4_acquired = 0;
 static int sIPv6_acquired = 0;
+#else
+static int sIPv4_acquired = 0;
 #endif
 
 /**************************************************************************/
@@ -2053,6 +2055,8 @@ static void *GWP_sysevent_threadfunc(void *data)
     //Intel Proposed RDKB Generic Bug Fix from XB6 SDK	
     async_id_t wan_ipaddr_asyncid;
     async_id_t dhcp6_addr_asyncid;
+#else
+    async_id_t wan_ipaddr_asyncid;
 #endif
 
     char buf[10];
@@ -2089,6 +2093,8 @@ static void *GWP_sysevent_threadfunc(void *data)
     sysevent_setnotification(sysevent_fd, sysevent_token, "current_wan_ipaddr",  &wan_ipaddr_asyncid);
     /* Registering to get notification for IPv6 address assigned to erouter */
     sysevent_setnotification(sysevent_fd, sysevent_token, "ipv6_dhcp6_addr",  &dhcp6_addr_asyncid);
+#else
+    sysevent_setnotification(sysevent_fd, sysevent_token, "current_wan_ipaddr",  &wan_ipaddr_asyncid);
 #endif
 
     sysevent_set_options(sysevent_fd, sysevent_token, "system-restart", TUPLE_FLAG_EVENT);
@@ -2582,6 +2588,20 @@ static void *GWP_sysevent_threadfunc(void *data)
                 {
                     setGWP_ipv6_event();
                     sIPv6_acquired = 1; /* Setting it here, to send IPv6 event only once. Ignore any further RENEW/REBIND messages*/
+                }
+            }
+#else
+	    else if (ret_value == CURRENT_WAN_IPADDR)
+            {
+                sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-status", "up", 0);
+                if (!sIPv4_acquired && val )
+                {
+                    rc = strcmp_s("0.0.0.0", strlen("0.0.0.0"),val, &ind);
+                    ERR_CHK(rc);
+                    if ((ind != 0) && (rc == EOK)){
+                        system("print_uptime \"wan_ipv4_up\"");
+                        sIPv4_acquired = 1;
+                    }
                 }
             }
 #endif
@@ -3481,6 +3501,7 @@ static int GWP_act_ProvEntry_callback()
     registerDocsisInitEvents();
 #endif
     GWPROV_PRINT(" Calling /etc/utopia/utopia_init.sh \n"); 
+    system("print_uptime \"utopia_init_start\"");
     system("/etc/utopia/utopia_init.sh");
 
     syscfg_init();
