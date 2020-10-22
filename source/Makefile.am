@@ -47,7 +47,7 @@ gw_prov_utopia_LDFLAGS += -lhal_ethsw
 endif
 
 gw_prov_utopia_SOURCES += gw_prov_sm_helper.c
-gw_prov_utopia_LDFLAGS += -lccsp_common
+gw_prov_utopia_LDFLAGS += -lccsp_common -lcm_mgnt
 
 if WITH_GTEST_SUPPORT
 SUBDIRS = test
