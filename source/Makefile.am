@@ -46,7 +46,7 @@ endif
 
 # LGI ADD START
 gw_prov_utopia_SOURCES += gw_prov_sm_helper.c
-gw_prov_utopia_LDFLAGS += -lccsp_common
+gw_prov_utopia_LDFLAGS += -lccsp_common -lcm_mgnt
 # LGI ADD END
 
 if WITH_GTEST_SUPPORT
