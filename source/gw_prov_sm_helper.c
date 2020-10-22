@@ -32,6 +32,8 @@
 
 #include "gw_prov_sm_helper.h"
 
+#include <cm_hal.h>
+
 typedef struct _DmObject
 {
     char Name[256];
@@ -372,6 +374,9 @@ int GWP_act_ErouterSnmpInitModeSet_callback(void)
     esafeErouterInitModeExtIf_e initMode;
 
     esafeErouterOperModeExtIf_e esafeDbOperMode;
+
+    /* Get the initMode */
+    cm_hal_Get_ErouterModeControl(&initMode);
     eSafeDevice_GetErouterOperationMode(&esafeDbOperMode);
 
     fprintf(stderr, "%s - snmp init mode:%d, eRouterMode:%d, oldRouterMode:%d, SysCfg-LastMode:%d, esafeDbOperMode:%d, cfgFileRouterMode:%d\n",
