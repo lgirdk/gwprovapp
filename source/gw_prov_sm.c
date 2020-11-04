@@ -3234,7 +3234,7 @@ static int GWP_act_DocsisTftpOk_callback(){
 static void LAN_start() {
     int i;
     char buf[10];
-#ifdef RDKB_DSLITE
+#ifdef DSLITE_FEATURE_SUPPORT
     char _4_to_6_status[2]={0};
     int dslite_enable=0;
 #endif
@@ -3264,7 +3264,7 @@ static void LAN_start() {
         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge-start", "", 0);
     }
     
-#ifdef RDKB_DSLITE
+#ifdef DSLITE_FEATURE_SUPPORT
 /* Check if 4_to_6 tunnel support is enabled */
     syscfg_get(NULL, "4_to_6_enabled", _4_to_6_status, sizeof(_4_to_6_status));
     dslite_enable = atoi(_4_to_6_status);
