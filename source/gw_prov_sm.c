@@ -1440,6 +1440,8 @@ static void GWP_EnableERouter(void)
     
     eSafeDevice_SetProvisioningStatusProgress(ESAFE_PROV_STATE_IN_PROGRESS_extIf);
 	
+    /* Disconnect docsis Local Bridge */
+    connectLocalBridge(false);
 #endif
     //bridge_mode = 0;
     //system("sysevent set bridge_mode 0");
@@ -1502,6 +1504,9 @@ static void GWP_DisableERouter(void)
     
     /* Reset Switch, to remove all VLANs */ 
     eSafeDevice_SetProvisioningStatusProgress(ESAFE_PROV_STATE_NOT_INITIATED_extIf);
+
+    /* Connect to docsis Local Bridge */
+    connectLocalBridge(true);
 #endif
 //    char sysevent_cmd[80];
 //     snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", bridge_mode);
@@ -3506,10 +3511,18 @@ static int GWP_act_DocsisInited_callback()
   
    	eSafeDevice_SetServiceIntImpact();
 
-    /* Disconnect docsis LB */
-    printf("Disconnecting DOCSIS local bridge\n");
+    if (eRouterMode == DOCESAFE_ENABLE_DISABLE_extIf)
+    {
+        GWPROV_PRINT("erouter is disabled, connecting to DOCSIS local bridge\n");
+        connectLocalBridge(true);
+    }
+    else
+    {
+        /* Disconnect docsis LB */
+        printf("Disconnecting DOCSIS local bridge\n");
         GWPROV_PRINT(" Disconnecting DOCSIS local bridge\n");
-    connectLocalBridge(false);
+        connectLocalBridge(false);
+    }
 
     /* This is an SRN, reply */
     printf("Got Docsis INIT - replying\n");
