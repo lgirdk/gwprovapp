@@ -28,6 +28,9 @@
 
 #include "gw_prov_sm_helper.h"
 
+#include "ccsp_alias_mgr.h"
+#include "ccsp_alias_mgr_helper.h"
+
 int cfgFileRouterMode = -1;
 
 #define MAX_ARGS 20
@@ -683,7 +686,64 @@ static bool check_alias(char * cmd_output, char * alias)
     }
     return success;
 }
+/**************************************************************************/
+/*! \fn bool is_customer_data_model()
+ **************************************************************************
+ *  \brief Check whether customer data-model is in place
+ *  \return true if the customer data-model is enabled
+ **************************************************************************/
+static bool is_customer_data_model()
+{
+    char sysbuf[8] = {0};
 
+    syscfg_init();
+
+    syscfg_get( NULL, "custom_data_model_enabled", sysbuf, sizeof(sysbuf));
+
+    if (sysbuf[0] != 0)
+    {
+        if ( !strcmp(sysbuf, "1") )
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        printf("syscfg_get returned an empty string for custom_data_model_enabled\n");
+        return false;
+    }
+}
+/**************************************************************************/
+/*! \fn char* get_customer_data_model_file_name()
+ **************************************************************************
+ *  \brief Get customer daya-model mapper file name
+ *  \return char* customer data-model mapper name if set
+ **************************************************************************/
+static char* get_customer_data_model_file_name()
+{
+    char* sysbuf = malloc(256);
+
+    memset(sysbuf, 0, 256);
+
+    syscfg_init();
+
+    syscfg_get( NULL, "custom_data_model_file_name", sysbuf, 256);
+
+    if ( sysbuf[0] != 0 )
+    {
+        return sysbuf;
+    }
+    else
+    {
+        printf("syscfg_get returned an empty string for custom_data_model_file_name\n");
+        free(sysbuf);
+        return NULL;
+    }
+}
 /**************************************************************************/
 /*! \fn bool GW_DmObjectThread(void *pParam);
  **************************************************************************
@@ -698,10 +758,32 @@ static void *GW_DmObjectThread(void *pParam)
     int ret = -1, i;
     long inst;
     char *parent, *alias, *p, *parameterName;
+    ANSC_HANDLE aliasMgr = NULL;         // AliasManager handle for DataModel names' aliasing
     char *internalName;
 
     /* copy to local buffer so we can manipulate it */
     char tlvData[GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT_MAX_LEN + 1];
+
+    if (is_customer_data_model())
+    {
+        char* customer_file_name = get_customer_data_model_file_name();
+
+        if (customer_file_name)
+        {
+            aliasMgr = CcspAliasMgrInitialize();
+
+            if (!CcspAliasMgrLoadMappingFile(aliasMgr, customer_file_name))
+            {
+                printf("gw-prov-app: Failed to load alias mapping file %s\n", customer_file_name);
+                CcspAliasMgrFree(aliasMgr);
+                aliasMgr = NULL;
+            }
+            else
+            {
+                printf("gw-prov-app: customer data-model %s successfully loaded\n", customer_file_name);
+            }
+        }
+    }
 
     while (1)
     {
@@ -775,6 +857,18 @@ static void *GW_DmObjectThread(void *pParam)
                 {
                     fprintf(stderr, "Invalid format for TLV202.43.12: '%s'\n", tlvData);
                     continue;
+                }
+
+		if (aliasMgr != NULL)
+                {
+                    internalName = CcspAliasMgrGetFirstInternalName(aliasMgr, dmObject.Name);
+
+                    if (internalName)
+                    {
+                        printf("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", dmObject.Name, internalName);
+                        strncpy(dmObject.Name, internalName, sizeof(dmObject.Name) - 1);
+                        AnscFreeMemory(internalName);
+                    }
                 }
 
                 /* convert TR069 type to dmcli type */
@@ -864,6 +958,11 @@ static void *GW_DmObjectThread(void *pParam)
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_apply", "", 0);
             gbDmObjectParseCfgDone = false;
         }
+    }
+
+    if (aliasMgr)
+    {
+        CcspAliasMgrFree(aliasMgr);
     }
 
     return NULL;
