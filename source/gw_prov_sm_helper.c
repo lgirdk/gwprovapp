@@ -28,6 +28,9 @@
 
 #include "gw_prov_sm_helper.h"
 
+#include "ccsp_alias_mgr.h"
+#include "ccsp_alias_mgr_helper.h"
+
 int cfgFileRouterMode = -1;
 
 #define MAX_ARGS 20
@@ -35,6 +38,8 @@ int cfgFileRouterMode = -1;
 #define MAX_LEN 16
 #define DHCPV4_PID_FILE "/var/run/eRT_ti_udhcpc.pid"
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
+
+#define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
 
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
@@ -693,6 +698,28 @@ static bool check_alias(char * cmd_output, char * alias)
     }
     return success;
 }
+/**************************************************************************/
+/*! \fn bool is_customer_data_model()
+ **************************************************************************
+ *  \brief Check whether customer data-model is in place
+ *  \return true if the customer data-model is enabled
+ **************************************************************************/
+static bool is_customer_data_model (void)
+{
+    char sysbuf[8];
+
+    syscfg_init();
+
+    if (syscfg_get (NULL, "custom_data_model_enabled", sysbuf, sizeof(sysbuf)) == 0)
+    {
+        if (strcmp (sysbuf, "1") == 0)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 /**************************************************************************/
 /*! \fn bool GW_DmObjectThread(void *pParam);
@@ -708,10 +735,27 @@ static void *GW_DmObjectThread(void *pParam)
     int ret = -1, i;
     long inst;
     char *parent, *alias, *p, *parameterName;
+    ANSC_HANDLE aliasMgr = NULL;         // AliasManager handle for DataModel names' aliasing
     char *internalName;
 
     /* copy to local buffer so we can manipulate it */
     char tlvData[GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT_MAX_LEN + 1];
+
+    if (is_customer_data_model())
+    {
+        aliasMgr = CcspAliasMgrInitialize();
+
+        if (!CcspAliasMgrLoadMappingFile(aliasMgr, ALIAS_MANAGER_MAPPER_FILE))
+        {
+            printf("gw-prov-app: Failed to load alias mapping file %s\n", ALIAS_MANAGER_MAPPER_FILE);
+            CcspAliasMgrFree(aliasMgr);
+            aliasMgr = NULL;
+        }
+        else
+        {
+            printf("gw-prov-app: customer data-model %s successfully loaded\n", ALIAS_MANAGER_MAPPER_FILE);
+        }
+    }
 
     while (1)
     {
@@ -785,6 +829,18 @@ static void *GW_DmObjectThread(void *pParam)
                 {
                     fprintf(stderr, "Invalid format for TLV202.43.12: '%s'\n", tlvData);
                     continue;
+                }
+
+		if (aliasMgr != NULL)
+                {
+                    internalName = CcspAliasMgrGetFirstInternalName(aliasMgr, dmObject.Name);
+
+                    if (internalName)
+                    {
+                        printf("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", dmObject.Name, internalName);
+                        strncpy(dmObject.Name, internalName, sizeof(dmObject.Name) - 1);
+                        AnscFreeMemory(internalName);
+                    }
                 }
 
                 /* convert TR069 type to dmcli type */
@@ -874,6 +930,11 @@ static void *GW_DmObjectThread(void *pParam)
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_apply", "", 0);
             gbDmObjectParseCfgDone = false;
         }
+    }
+
+    if (aliasMgr)
+    {
+        CcspAliasMgrFree(aliasMgr);
     }
 
     return NULL;
