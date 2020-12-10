@@ -39,6 +39,8 @@ int cfgFileRouterMode = -1;
 #define DHCPV4_PID_FILE "/var/run/eRT_ti_udhcpc.pid"
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
 
+#define CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE "/usr/ccsp/tr069pa/custom_mapper.xml"
+
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
 static bool gbDmObjectParseCfgDone = false;
@@ -692,58 +694,23 @@ static bool check_alias(char * cmd_output, char * alias)
  *  \brief Check whether customer data-model is in place
  *  \return true if the customer data-model is enabled
  **************************************************************************/
-static bool is_customer_data_model()
+static bool is_customer_data_model (void)
 {
-    char sysbuf[8] = {0};
+    char sysbuf[8];
 
     syscfg_init();
 
-    syscfg_get( NULL, "custom_data_model_enabled", sysbuf, sizeof(sysbuf));
-
-    if (sysbuf[0] != 0)
+    if (syscfg_get (NULL, "custom_data_model_enabled", sysbuf, sizeof(sysbuf)) == 0)
     {
-        if ( !strcmp(sysbuf, "1") )
+        if (strcmp (sysbuf, "1") == 0)
         {
             return true;
         }
-        else
-        {
-            return false;
-        }
     }
-    else
-    {
-        printf("syscfg_get returned an empty string for custom_data_model_enabled\n");
-        return false;
-    }
+
+    return false;
 }
-/**************************************************************************/
-/*! \fn char* get_customer_data_model_file_name()
- **************************************************************************
- *  \brief Get customer daya-model mapper file name
- *  \return char* customer data-model mapper name if set
- **************************************************************************/
-static char* get_customer_data_model_file_name()
-{
-    char* sysbuf = malloc(256);
 
-    memset(sysbuf, 0, 256);
-
-    syscfg_init();
-
-    syscfg_get( NULL, "custom_data_model_file_name", sysbuf, 256);
-
-    if ( sysbuf[0] != 0 )
-    {
-        return sysbuf;
-    }
-    else
-    {
-        printf("syscfg_get returned an empty string for custom_data_model_file_name\n");
-        free(sysbuf);
-        return NULL;
-    }
-}
 /**************************************************************************/
 /*! \fn bool GW_DmObjectThread(void *pParam);
  **************************************************************************
@@ -766,22 +733,17 @@ static void *GW_DmObjectThread(void *pParam)
 
     if (is_customer_data_model())
     {
-        char* customer_file_name = get_customer_data_model_file_name();
+        aliasMgr = CcspAliasMgrInitialize();
 
-        if (customer_file_name)
+        if (!CcspAliasMgrLoadMappingFile(aliasMgr, CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE))
         {
-            aliasMgr = CcspAliasMgrInitialize();
-
-            if (!CcspAliasMgrLoadMappingFile(aliasMgr, customer_file_name))
-            {
-                printf("gw-prov-app: Failed to load alias mapping file %s\n", customer_file_name);
-                CcspAliasMgrFree(aliasMgr);
-                aliasMgr = NULL;
-            }
-            else
-            {
-                printf("gw-prov-app: customer data-model %s successfully loaded\n", customer_file_name);
-            }
+            printf("gw-prov-app: Failed to load alias mapping file %s\n", CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE);
+            CcspAliasMgrFree(aliasMgr);
+            aliasMgr = NULL;
+        }
+        else
+        {
+            printf("gw-prov-app: customer data-model %s successfully loaded\n", CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE);
         }
     }
 
