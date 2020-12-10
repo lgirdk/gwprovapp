@@ -27,10 +27,11 @@
 #include <time.h>
 
 #include "gw_prov_sm_helper.h"
-#include "cm_hal.h"
 
 #include "ccsp_alias_mgr.h"
 #include "ccsp_alias_mgr_helper.h"
+
+#include <cm_hal.h>
 
 int cfgFileRouterMode = -1;
 
