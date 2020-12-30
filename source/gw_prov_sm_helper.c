@@ -30,6 +30,7 @@
 #include <ccsp_alias_mgr_helper.h>
 #include <syscfg/syscfg.h>
 
+#include "gw_prov_sm.h"
 #include "gw_prov_sm_helper.h"
 
 #include <cm_hal.h>
@@ -40,6 +41,7 @@ typedef struct _DmObject
     char Type[16];
     char Value[256];
     int  FailureCount;
+    bool IsAliasBased;
     struct _DmObject *pNext;
 } DmObject_t;
 
@@ -59,6 +61,7 @@ static bool gbDmObjectParseCfgDone = false;
 static int DmObjectSockFds[2];
 
 static void Send_Release(char *file_name);
+static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded);
 
 static int SaveRestartMask(unsigned long mask)
 {
@@ -302,7 +305,8 @@ static int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int cou
    Buffer needs to be freed by caller. */
 static int run_cmd(const char *caller, char *cmd, char **retBuf)
 {
-    return run_cmd_timeout(caller, cmd, retBuf, 100); // 5 second timeout (100 * 50ms)
+    /* Sometimes during the boot up it takes more than 20 sec for a child process to get executed */
+    return run_cmd_timeout(caller, cmd, retBuf, 400); // 20 second timeout (400 * 50ms)
 }
 
 void *GWP_start_hotspot_threadfunc(void *data)
@@ -612,9 +616,16 @@ static void GW_DmObjectListApply(void)
 
     while (pCurr != NULL)
     {
-        /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
-           for invalid value, etc., but in those cases we don't want to retry because there is no point */
-        success = GW_SetParam(pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+        if(pCurr->IsAliasBased)
+        {
+            success = GW_HandleAliasDm(*pCurr, 0);
+        }
+        else
+        {
+            /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
+            for invalid value, etc., but in those cases we don't want to retry because there is no point */
+            success = GW_SetParam(pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+        }
         if (!success)
         {
             pCurr->FailureCount++;
@@ -629,6 +640,10 @@ static void GW_DmObjectListApply(void)
             else
             {
                 pPrev->pNext = pCurr->pNext;
+            }
+
+            if(pCurr->FailureCount > MAX_DM_OBJ_RETRIES) {
+                GWPROV_PRINT(" Failed to apply param : %s Tried %d no of times.\n", pCurr->Name, MAX_DM_OBJ_RETRIES);
             }
 
             /* free the node */
@@ -661,6 +676,25 @@ static void GW_DmObjectApplyWiFiSettings(void)
 #endif
 
 /**************************************************************************/
+/*! \fn char* last_occurrence(char *haystack, char *needle);
+ **************************************************************************
+ *  \brief Find the last occurrence of needle
+ *  \return last occurrence of needle. If not found null
+ **************************************************************************/
+static char* last_occurrence(char *haystack, char *needle)
+{
+    char *ptr, *last = NULL;
+    ptr = haystack;
+    while((ptr = strstr(ptr, needle)) != NULL )
+    {
+        last = ptr;
+        ptr++;
+    }
+    return last;
+}
+
+
+/**************************************************************************/
 /*! \fn long find_instance(char *output, char *parent);
  **************************************************************************
  *  \brief Find The Instance Number
@@ -670,7 +704,7 @@ static long find_instance(char *output, char *parent)
 {
     long instance = 0;
     char *p;
-    p = strstr(output,parent);
+    p = last_occurrence(output,parent);
     if(p != NULL)
     {
         int size_of_parent = strlen(parent);
@@ -747,6 +781,141 @@ static bool is_customer_data_model (void)
 }
 
 /**************************************************************************/
+/*! \fn bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
+ **************************************************************************
+ *  \brief Handle [Alias] format TLV202.43.12 objects
+ *  \param[in] dmObject - Parameter which has the info about TLV202.43.12 object
+ *  \param[in] objectListAddNeeded - Indicates whether dmObject needs to be
+ *             added in list in case of failure
+ *  \return bool - true if dmObject successfully applied.
+ **************************************************************************/
+static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
+{
+    char *parent, *alias, *parameterName;
+    char *cmd_output = NULL;
+    int flag = 0;
+    long inst = -1;
+    char cmd[1024];
+    int  i;
+    bool return_value = false;
+    char *object_name;
+    char *comp_not_found_err = "Can't find destination component";
+    char *execution_fail_err = "Execution fail";
+
+    object_name = strdup(dmObject.Name);
+    if(object_name == NULL)
+    {
+        GWPROV_PRINT("strdup failed in %s\n",__func__);
+        goto out;
+    }
+
+    parent = strtok(object_name, "[");
+    alias = strtok(NULL, "]");
+    parameterName = strtok(NULL,"].");
+
+    if((parent == NULL) || (alias == NULL) || (parameterName == NULL))
+    {
+        GWPROV_PRINT("Invalid format for [Alias] based TLV202.43.12: '%s'\n",dmObject.Name);
+        free(object_name);
+        return return_value;
+    }
+
+    snprintf(cmd, sizeof(cmd), "dmcli eRT getnames %s",parent);
+
+    run_cmd(__func__,cmd, &cmd_output);
+
+    if(cmd_output == NULL)
+    {
+        goto out;
+    }
+
+    /* If dmcli returns "Can't find destination component" error
+       that means ccsp components are not online yet. So add it
+       to the list for retry */
+    if(strstr(cmd_output, comp_not_found_err))
+    {
+        GWPROV_PRINT("ccsp components are not up yet...\n");
+        free(cmd_output);
+        goto out;
+    }
+
+    /* If dmcli returns "Execution fail" error then no need to add it to the list for retrying */
+    if(strstr(cmd_output, execution_fail_err))
+    {
+        GWPROV_PRINT("Execution failed : %s\n", cmd);
+        free(object_name);
+        free(cmd_output);
+        return return_value;
+    }
+
+    inst = find_instance(cmd_output, parent);
+
+    free(cmd_output);
+    cmd_output = NULL;
+
+    for(i = 1; i <= inst; i++)
+    {
+        snprintf(cmd, sizeof(cmd), "dmcli eRT getvalues %s%d.Alias",parent,i);
+        run_cmd(__func__,cmd, &cmd_output);
+
+        if(cmd_output != NULL)
+        {
+            bool isalias = check_alias(cmd_output, alias);
+
+            free(cmd_output);
+            cmd_output = NULL;
+
+            if(isalias)
+            {
+                flag = 1;
+                snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, i, parameterName);
+                if(GW_SetParam(cmd,dmObject.Type,dmObject.Value))
+                {
+                    /* return true only if the final object set is successful */
+                    return_value = true;
+                }
+                break;
+            }
+        }
+    }
+
+    if(!flag)
+    {
+        snprintf(cmd, sizeof(cmd), "dmcli eRT addtable %s ", parent);
+        run_cmd(__func__,cmd, &cmd_output);
+
+        if(cmd_output != NULL)
+        {
+            inst = find_instance(cmd_output, parent);
+            free(cmd_output);
+            cmd_output = NULL;
+
+            snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, inst);
+            if(GW_SetParam(cmd,"string", alias))
+            {
+                snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, inst, parameterName);
+                if(GW_SetParam(cmd,dmObject.Type,dmObject.Value ))
+                {
+                    /* return true only if the final object set is successful */
+                    return_value = true;
+                }
+            }
+        }
+    }
+
+out:
+
+    if(objectListAddNeeded)
+    {
+        GW_DmObjectListAdd(&dmObject);
+    }
+
+    free(object_name);
+
+    return return_value;
+}
+
+/**************************************************************************/
 /*! \fn bool GW_DmObjectThread(void *pParam);
  **************************************************************************
  *  \brief Worker thread to process VendorSpecific Sub TLVs (TLV202.43.x)
@@ -755,11 +924,6 @@ static bool is_customer_data_model (void)
  **************************************************************************/
 static void *GW_DmObjectThread(void *pParam)
 {
-    char cmd[1024];
-    char *cmd_output = NULL;
-    int ret = -1, i;
-    long inst;
-    char *parent, *alias, *p, *parameterName;
     ANSC_HANDLE aliasMgr = NULL;         // AliasManager handle for DataModel names' aliasing
     char *internalName;
 
@@ -876,67 +1040,27 @@ static void *GW_DmObjectThread(void *pParam)
                     continue;
                 }
 
+                dmObject.IsAliasBased = false;
                 if(strstr(dmObject.Name,"["))
                 {
-                    int flag = 0;
-                    parent = strtok(dmObject.Name, "[");
-                    alias = strtok(NULL, "]");
-                    parameterName = strtok(NULL,"].");
-
-                    snprintf(cmd, sizeof(cmd), "dmcli eRT getnames %s",parent);
-                    ret = run_cmd(__func__,cmd, &cmd_output);
-                    if(cmd_output != NULL)
-                    {
-                        inst = find_instance(cmd_output, parent);
-                        free(cmd_output);
-                    }
-                    for(i=1;i<=inst;i++)
-                    {
-                        snprintf(cmd, sizeof(cmd), "dmcli eRT getvalues %s%d.Alias",parent,i);
-                        ret = run_cmd(__func__,cmd, &cmd_output);
-
-                        if(cmd_output != NULL)
-                        {
-                            if(check_alias(cmd_output, alias))
-                            {
-                                free(cmd_output);
-                                flag = 1;
-                                snprintf(cmd, sizeof(cmd) - 1, "%s%d.%s", parent, i, parameterName);
-                                strncpy(dmObject.Name, cmd, sizeof(dmObject.Name)-1);
-                                break;
-                            }
-                            free(cmd_output);
-                        }
-                    }
-
-                    if(!flag)
-                    {
-                        snprintf(cmd, sizeof(cmd), "dmcli eRT addtable %s ", parent);
-                        ret = run_cmd(__func__,cmd, &cmd_output);
-                        if(cmd_output != NULL)
-                        {
-                            inst = find_instance(cmd_output, parent);
-                            free(cmd_output);
-                            snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, inst);
-                            if(!GW_SetParam(cmd,"string", alias))
-                            {
-                                DmObject_t AliasObject;
-                                strncpy(AliasObject.Name, cmd, sizeof(AliasObject.Name)-1);
-                                strncpy(AliasObject.Type, "string", sizeof(AliasObject.Type)-1);
-                                strncpy(AliasObject.Value, alias, sizeof(AliasObject.Value)-1);
-                                GW_DmObjectListAdd(&AliasObject);
-                            }
-                            snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, inst, parameterName);
-                            strncpy(dmObject.Name, cmd, sizeof(dmObject.Name)-1);
-                        }
-                    }
+                    GWPROV_PRINT("Processing a [Alias] based TLV202.43 object : %s \n", dmObject.Name);
+                    dmObject.IsAliasBased = true;
+                    GW_HandleAliasDm(dmObject, 1);
                 }
-                /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
-                   for invalid value, etc., but in those cases we don't want to retry because there is no point */
-                if (!GW_SetParam(dmObject.Name, pTypeDmcli, dmObject.Value))
+                else {
+                    GWPROV_PRINT("Processing a TLV202.43 object : %s \n", dmObject.Name);
+                }
+
+                /* Alias based TLV202.43.12 objects are handled in GW_HandleAliasDm. */
+                if(!dmObject.IsAliasBased)
                 {
-                    dmObject.FailureCount++;
-                    GW_DmObjectListAdd(&dmObject);
+                    /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
+                    for invalid value, etc., but in those cases we don't want to retry because there is no point */
+                    if (!GW_SetParam(dmObject.Name, pTypeDmcli, dmObject.Value))
+                    {
+                        dmObject.FailureCount++;
+                        GW_DmObjectListAdd(&dmObject);
+                    }
                 }
             }
         }
