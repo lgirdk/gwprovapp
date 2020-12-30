@@ -287,7 +287,7 @@ static int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int cou
    Buffer needs to be freed by caller. */
 static int run_cmd(const char *caller, char *cmd, char **retBuf)
 {
-    return run_cmd_timeout(caller, cmd, retBuf, 100); // 5 second timeout (100 * 50ms)
+    return run_cmd_timeout(caller, cmd, retBuf, 200); // 10 second timeout (200 * 50ms)
 }
 
 void *GWP_start_hotspot_threadfunc(void *data)
@@ -640,6 +640,25 @@ void GW_DmObjectApplyWiFiSettings(void)
 }
 
 /**************************************************************************/
+/*! \fn char* last_occurrence(char *haystack, char *needle);
+ **************************************************************************
+ *  \brief Find the last occurrence of needle
+ *  \return last occurrence of needle. If not found null
+ **************************************************************************/
+static char* last_occurrence(char *haystack, char *needle)
+{
+    char *ptr, *last = NULL;
+    ptr = haystack;
+    while((ptr = strstr(ptr, needle)) != NULL )
+    {
+        last = ptr;
+        ptr++;
+    }
+    return last;
+}
+
+
+/**************************************************************************/
 /*! \fn long find_instance(char *output, char *parent);
  **************************************************************************
  *  \brief Find The Instance Number
@@ -649,7 +668,7 @@ long find_instance(char *output, char *parent)
 {
     long instance = 0;
     char *p;
-    p = strstr(output,parent);
+    p = last_occurrence(output,parent);
     if(p != NULL)
     {
         int size_of_parent = strlen(parent);
@@ -733,7 +752,7 @@ static void *GW_DmObjectThread(void *pParam)
     char cmd[1024] = {0};
     char *cmd_output = NULL;
     int ret = -1, i;
-    long inst;
+    long inst = -1;
     char *parent, *alias, *p, *parameterName;
     ANSC_HANDLE aliasMgr = NULL;         // AliasManager handle for DataModel names' aliasing
     char *internalName;
@@ -757,6 +776,7 @@ static void *GW_DmObjectThread(void *pParam)
         }
     }
 
+    sleep(180); // It takes around 3 minutes for ccsp components to come online from this point
     while (1)
     {
         size_t bytesRead = 0;
