@@ -409,7 +409,6 @@ int getDecisionErouteOperMode() {
 
     /* Get eRouterSnmpInitMode value from esafe dB */
     cm_hal_Get_ErouterModeControl(&initMode);
-    eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
 
     GWPROV_PRINT("%s: esafeErouterInitModeControl is %d, eRouterMode: %d\n", __FUNCTION__, initMode, eRouterMode);
 
@@ -1359,10 +1358,6 @@ void docsis_gotEnable_callback(Uint8 state)
 {
 	GWPROV_PRINT(" Entry %s , state = %d \n", __FUNCTION__, state);
    eRouterMode = state;
-   GWP_SysCfgSetInt("last_erouter_mode", eRouterMode);
-   if (syscfg_commit() != 0)
-       printf("syscfg_commit  for new mode failed\n");
-
 }
 /**************************************************************************/
 /*! \fn void GWP_DocsisInited(void)
