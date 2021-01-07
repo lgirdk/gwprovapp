@@ -2572,6 +2572,13 @@ static void *GWP_sysevent_threadfunc(void *data)
                 rc = strcmp_s("started", strlen("started"),val, &ind);
                 ERR_CHK(rc);
                 if ((ind == 0) && (rc == EOK)){
+
+                    /*
+                        Reload NAT Passthrough as soon as possible after starting
+                        the LAN so that NPT clients won't accidentally get a LAN IP address
+                    */
+                    system("/etc/utopia/nat_passthrough.sh restart");
+
                     if (!webui_started) { 
 #if defined(_PLATFORM_RASPBERRYPI_)
 
