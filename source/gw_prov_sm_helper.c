@@ -39,7 +39,7 @@ int cfgFileRouterMode = -1;
 #define DHCPV4_PID_FILE "/var/run/eRT_ti_udhcpc.pid"
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
 
-#define CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE "/usr/ccsp/tr069pa/custom_mapper.xml"
+#define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
 
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
@@ -735,15 +735,15 @@ static void *GW_DmObjectThread(void *pParam)
     {
         aliasMgr = CcspAliasMgrInitialize();
 
-        if (!CcspAliasMgrLoadMappingFile(aliasMgr, CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE))
+        if (!CcspAliasMgrLoadMappingFile(aliasMgr, ALIAS_MANAGER_MAPPER_FILE))
         {
-            printf("gw-prov-app: Failed to load alias mapping file %s\n", CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE);
+            printf("gw-prov-app: Failed to load alias mapping file %s\n", ALIAS_MANAGER_MAPPER_FILE);
             CcspAliasMgrFree(aliasMgr);
             aliasMgr = NULL;
         }
         else
         {
-            printf("gw-prov-app: customer data-model %s successfully loaded\n", CCSP_TR069PA_CUSTOM_MAPPER_XML_FILE);
+            printf("gw-prov-app: customer data-model %s successfully loaded\n", ALIAS_MANAGER_MAPPER_FILE);
         }
     }
 
