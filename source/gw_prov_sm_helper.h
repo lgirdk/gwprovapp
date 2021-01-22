@@ -48,6 +48,7 @@ typedef struct _DmObject
     char Type[16];
     char Value[256];
     int  FailureCount;
+    bool IsAliasBased;
     struct _DmObject *pNext;
 } DmObject_t;
 
