@@ -43,6 +43,8 @@ int cfgFileRouterMode = -1;
 
 #define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
 
+static void Send_Release(char *file_name);
+
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
 static bool gbDmObjectParseCfgDone = false;
@@ -96,29 +98,30 @@ int RestartServicesPerMask(void)
     return 0;
 }
 
-void GW_TranslateGWmode2String( int gwmode, char *modestring )
+void GW_TranslateGWmode2String( int gwmode, char *modestring, size_t len)
 {
-    if ( !modestring )
-        return;
+    char *s;
+
     switch ( gwmode )
     {
         case DOCESAFE_ENABLE_DISABLE_extIf:
-            sprintf(modestring, "Bridge mode");
+            s = "Bridge mode";
             break;
         case DOCESAFE_ENABLE_IPv4_extIf:
-            sprintf(modestring, "IPv4-Only mode");
+            s = "IPv4-Only mode";
             break;
         case DOCESAFE_ENABLE_IPv6_extIf:
-            sprintf(modestring, "IPv6-Only mode");
+            s = "IPv6-Only mode";
             break;
         case DOCESAFE_ENABLE_IPv4_IPv6_extIf:
-            sprintf(modestring, "Dual-Stack mode");
+            s = "Dual-Stack mode";
             break;
         default:
-            sprintf(modestring, "Bridge mode");
+            s = "Bridge mode";
             break;
     }
-    return;
+
+    snprintf (modestring, len, "%s", s);
 }
 
 static int run_cmd_timeout(const char *caller, char *cmd, char **retBuf, int count)
@@ -295,12 +298,13 @@ static int run_cmd(const char *caller, char *cmd, char **retBuf)
 void *GWP_start_hotspot_threadfunc(void *data)
 {
     int timeout = 30;
-    char erouter_ipv6[64] = {0};
+    char erouter_ipv6[64];
 
     while(--timeout >= 0)
     {
+        erouter_ipv6[0] = 0;
         sysevent_get(sysevent_fd_gs, sysevent_token_gs, "tr_erouter0_dhcpv6_client_v6addr", erouter_ipv6, sizeof(erouter_ipv6));
-        if(strlen(erouter_ipv6))
+        if (erouter_ipv6[0] != 0)
         {
             fprintf(stderr,"=========eRouter IPv6 address got: %s=========\n", erouter_ipv6);
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
@@ -345,7 +349,7 @@ void translateErouterSnmpInitModeToOperMode(esafeErouterInitModeExtIf_e initMode
     }
 }
 
-int GWP_act_ErouterSnmpInitModeSet_callback()
+int GWP_act_ErouterSnmpInitModeSet_callback(void)
 {
     esafeErouterInitModeExtIf_e initMode;
 
@@ -387,10 +391,10 @@ int GWP_act_ErouterSnmpInitModeSet_callback()
         eRouterMode = newErouterMode;
         fprintf(stderr, "%s - Switching erouter mode from %d to %d, will reboot\n", __FUNCTION__, (int)oldRouterMode, (int)newErouterMode);
         char logbuf[256];
-        char oldmode[32] = {0};
-        char newmode[32] = {0};
-        GW_TranslateGWmode2String(oldRouterMode, oldmode);
-        GW_TranslateGWmode2String(eRouterMode, newmode);
+        char oldmode[32];
+        char newmode[32];
+        GW_TranslateGWmode2String(oldRouterMode, oldmode, sizeof(oldmode));
+        GW_TranslateGWmode2String(eRouterMode, newmode, sizeof(newmode));
         snprintf(logbuf, sizeof(logbuf), "Reboot on change of device mode, from %s to %s", oldmode, newmode);
         Send_Release(DHCPV4_PID_FILE);
         Send_Release(DHCPV6_PID_FILE);
@@ -460,8 +464,9 @@ static const char *GW_MapTr69TypeToDmcliType(const char *tr69Type)
  **************************************************************************/
 static bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
 {
-    char buf[256] = {0};
-    while (fgets(buf, sizeof(buf) - 1, pFile) != NULL)
+    char buf[256];
+
+    while (fgets(buf, sizeof(buf), pFile) != NULL)
     {
         if (strstr(buf, errorStr) != NULL)
         {
@@ -483,9 +488,8 @@ static bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
  **************************************************************************/
 static bool GW_SetParam(const char *pName, const char *pType, const char *pValue)
 {
+    char cmd[1024];
     bool success = false;
-    char cmd[1024] = {0};
-    char errorStr[] = "Can't find destination component";
     FILE *result = NULL;
 
     if (pName == NULL || pType == NULL || pValue == NULL)
@@ -501,7 +505,7 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
 
     /* Call dmcli to apply the parameter. This really needs to be reworked to use d-bus
        transactions directly. That is something for future enhancement. */
-    snprintf(cmd, sizeof(cmd) - 1, "dmcli eRT setvalues '%s' %s '%s'", pName, pType, pValue);
+    snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", pName, pType, pValue);
 
     /* Retry on "Can't find dest component" error to workaround startup timing sensitivity */
     result = popen(cmd, "r");
@@ -536,7 +540,7 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
  *  \param[in] pDmObj - Parameter to add (must be copied)
  *  \return none
  **************************************************************************/
-void GW_DmObjectListAdd(DmObject_t *pDmObj)
+static void GW_DmObjectListAdd(DmObject_t *pDmObj)
 {
     /* make a copy of the object to store */
     DmObject_t *pNewDmObj = malloc(sizeof(DmObject_t));
@@ -567,7 +571,7 @@ void GW_DmObjectListAdd(DmObject_t *pDmObj)
  *  \brief Determines if DataModel list is empty
  *  \return bool - true if the list is empty
  **************************************************************************/
-bool GW_DmObjectListIsEmpty(void)
+static bool GW_DmObjectListIsEmpty(void)
 {
     return (gpDmObjectHead == NULL);
 }
@@ -580,7 +584,7 @@ bool GW_DmObjectListIsEmpty(void)
  *         max retries exceeded.
  *  \return none
  **************************************************************************/
-void GW_DmObjectListApply(void)
+static void GW_DmObjectListApply(void)
 {
     bool success = false;
     DmObject_t *pPrev = NULL;
@@ -626,13 +630,15 @@ void GW_DmObjectListApply(void)
  *  \brief Applies WiFi Settings using the DataModel
  *  \return none
  **************************************************************************/
-void GW_DmObjectApplyWiFiSettings(void)
+#if 0
+static void GW_DmObjectApplyWiFiSettings(void)
 {
     GW_SetParam("Device.WiFi.Radio.1.X_CISCO_COM_ApplySettingSSID", "int", "1");
     GW_SetParam("Device.WiFi.Radio.1.X_CISCO_COM_ApplySetting", "bool", "true");
     GW_SetParam("Device.WiFi.Radio.2.X_CISCO_COM_ApplySettingSSID", "int", "2");
     GW_SetParam("Device.WiFi.Radio.2.X_CISCO_COM_ApplySetting", "bool", "true");
 }
+#endif
 
 /**************************************************************************/
 /*! \fn char* last_occurrence(char *haystack, char *needle);
@@ -659,7 +665,7 @@ static char* last_occurrence(char *haystack, char *needle)
  *  \brief Find The Instance Number
  *  \return long Instance Number
  **************************************************************************/
-long find_instance(char *output, char *parent)
+static long find_instance(char *output, char *parent)
 {
     long instance = 0;
     char *p;
@@ -693,20 +699,22 @@ static bool check_alias(char * cmd_output, char * alias)
 {
     bool success = false;
     char *tmp = NULL;
+
     if(cmd_output && alias)
     {
         tmp = strstr(cmd_output, "value:");
         if(tmp)
         {
-            sscanf(tmp, "value: %m[^ \n]\n", &tmp);
-            if(tmp)
+            char *p;
+
+            if (sscanf(tmp, "value: %m[^ \n]\n", &p) == 1)
             {
-                if((strlen(tmp) == strlen(alias)) && !strncmp(tmp,alias,strlen(alias)))
+                if(strcmp(p,alias) == 0)
                 {
                     success = true;
                 }
-                free(tmp);
-                tmp = NULL;
+                free(p);
+                p = NULL;
             }
         }
     }
@@ -744,7 +752,7 @@ static bool is_customer_data_model (void)
  **************************************************************************/
 static void *GW_DmObjectThread(void *pParam)
 {
-    char cmd[1024] = {0};
+    char cmd[1024];
     char *cmd_output = NULL;
     int ret = -1, i;
     long inst = -1;
@@ -901,13 +909,13 @@ static void *GW_DmObjectThread(void *pParam)
 
                     if(!flag)
                     {
-                        snprintf(cmd, sizeof(cmd) - 1, "dmcli eRT addtable %s ", parent);
+                        snprintf(cmd, sizeof(cmd), "dmcli eRT addtable %s ", parent);
                         ret = run_cmd(__func__,cmd, &cmd_output);
                         if(cmd_output != NULL)
                         {
                             inst = find_instance(cmd_output, parent);
                             free(cmd_output);
-                            snprintf(cmd, sizeof(cmd) - 1, "%s%d.Alias", parent, inst);
+                            snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, inst);
                             if(!GW_SetParam(cmd,"string", alias))
                             {
                                 DmObject_t AliasObject;
@@ -916,7 +924,7 @@ static void *GW_DmObjectThread(void *pParam)
                                 strncpy(AliasObject.Value, alias, sizeof(AliasObject.Value)-1);
                                 GW_DmObjectListAdd(&AliasObject);
                             }
-                            snprintf(cmd, sizeof(cmd) - 1, "%s%d.%s", parent, inst, parameterName);
+                            snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, inst, parameterName);
                             strncpy(dmObject.Name, cmd, sizeof(dmObject.Name)-1);
                         }
                     }
@@ -1003,7 +1011,7 @@ TlvParseCallbackStatusExtIf_e GW_VendorSpecificSubTLVParse(unsigned char type, u
     return TLV_PARSE_CALLBACK_OK_EXTIF;
 }
 
-void Send_Release(char *file_name)
+static void Send_Release(char *file_name)
 {
     FILE *fp = NULL;
     char pid_str[MAX_LEN] = {0};
