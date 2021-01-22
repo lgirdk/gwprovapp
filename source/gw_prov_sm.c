@@ -2234,10 +2234,10 @@ static void *GWP_sysevent_threadfunc(void *data)
                 }
                 //LGI ADD START
                 char logbuf[256];
-                char oldmode[32] = {0};
-                char newmode[32] = {0};
-                GW_TranslateGWmode2String(oldRouterMode, oldmode);
-                GW_TranslateGWmode2String(eRouterMode, newmode);
+                char oldmode[32];
+                char newmode[32];
+                GW_TranslateGWmode2String(oldRouterMode, oldmode, sizeof(oldmode));
+                GW_TranslateGWmode2String(eRouterMode, newmode, sizeof(newmode));
                 snprintf(logbuf, sizeof(logbuf), "Reboot on change of device mode, from %s to %s", oldmode, newmode);
                 sleep(5);
                 //LGI ADD END
