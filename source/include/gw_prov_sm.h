@@ -5,11 +5,11 @@
 #define COMP_NAME "LOG.RDK.GWPROV"
 #define LOG_INFO 4
 
-char log_buff[1024];
 #ifdef FEATURE_SUPPORT_RDKLOG
 #define GWPROV_PRINT(fmt ...)    {\
-                                                                snprintf(log_buff, 1023, fmt);\
-                                    RDK_LOG(LOG_INFO, COMP_NAME, "%s", log_buff);\
+                                     char _log_buff[1024]; \
+                                     snprintf(_log_buff, sizeof(_log_buff), fmt);\
+                                     RDK_LOG(LOG_INFO, COMP_NAME, "%s", _log_buff);\
                                  }
 #else
 #define GWPROV_PRINT printf
