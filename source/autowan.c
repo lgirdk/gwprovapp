@@ -791,7 +791,7 @@ int TryAltWan(int *mode)
 #endif
                system("killall dibbler-client");
                memset(command, 0, sizeof(command));
-               snprintf(command,sizeof(command), "sh /etc/dibbler/dibbler-init.sh");
+               snprintf(command,sizeof(command), "sh /lib/rdk/dibbler-init.sh");
                system(command);
                memset(command, 0, sizeof(command));
                snprintf(command,sizeof(command), "/usr/sbin/dibbler-client start");
