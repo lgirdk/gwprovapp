@@ -164,7 +164,7 @@
 #endif
 
 #ifdef FEATURE_SUPPORT_RDKLOG
-void GWPROV_PRINT(const char *format, ...)
+static void GWPROV_PRINT(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
