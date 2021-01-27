@@ -99,10 +99,6 @@
 #define PORT 8081
 #endif
 
-/* Global Variables*/
-#if !defined(AUTOWAN_ENABLE)
-char log_buff[1024];
-#endif
 #define WHITE	0
 #define RED	3
 #define SOLID	0
@@ -160,10 +156,11 @@ char log_buff[1024];
 
 #if !defined(AUTOWAN_ENABLE)
 #ifdef FEATURE_SUPPORT_RDKLOG
-#define GWPROV_PRINT(fmt ...)    {\
-				    				snprintf(log_buff, 1023, fmt);\
-                                    RDK_LOG(LOG_INFO, COMP_NAME, "%s", log_buff);\
-                                 }
+#define GWPROV_PRINT(fmt ...)   {\
+                                    char _log_buff[1024]; \
+                                    snprintf(_log_buff, sizeof(_log_buff), fmt);\
+                                    RDK_LOG(LOG_INFO, COMP_NAME, "%s", _log_buff);\
+                                }
 #else
 #define GWPROV_PRINT printf
 #endif
