@@ -1355,6 +1355,8 @@ void docsis_gotEnable_callback(Uint8 state)
 {
 	GWPROV_PRINT(" Entry %s , state = %d \n", __FUNCTION__, state);
    eRouterMode = state;
+
+    cfgFileRouterMode = (int)state;  // LGI ADD - Save TLV202.1 init mode from config file
 }
 /**************************************************************************/
 /*! \fn void GWP_DocsisInited(void)

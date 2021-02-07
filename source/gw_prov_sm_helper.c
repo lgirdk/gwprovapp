@@ -334,7 +334,16 @@ void *GWP_start_hotspot_threadfunc(void *data)
 
 void GWP_Update_ErouterMode_by_InitMode(void)
 {
-    getDecisionErouteOperMode();
+
+    // If Erouter SNMP Init Mode is not set to Honor, then it must take precedence over the init mode in the config file.
+    esafeErouterInitModeExtIf_e initMode = DOCESAFE_EROUTER_INIT_MODE_HONOR_ROUTER_INIT_extIf;
+
+    /* Get eRouterSnmpInitMode value from esafe dB */
+    cm_hal_Get_ErouterModeControl(&initMode);
+    if (initMode != DOCESAFE_EROUTER_INIT_MODE_HONOR_ROUTER_INIT_extIf)
+    {
+        translateErouterSnmpInitModeToOperMode(initMode, &eRouterMode);
+    }
 
     GWP_UpdateERouterMode();
 
