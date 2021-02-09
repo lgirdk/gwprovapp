@@ -94,6 +94,15 @@ typedef struct mac_addr
 /* Data Model Object (TLV 43.12) related defines */
 #define GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT_MAX_LEN 256
 
+/*! \var typedef enum esafeErouterOperStatus_e
+ *  \brief Status of erouter0 interface
+*/
+typedef enum
+{
+    DOCESAFE_EROUTER_IFOPERSTATUS_UP = 1,
+    DOCESAFE_EROUTER_IFOPERSTATUS_DOWN = 2
+} esafeErouterOperStatus_e;
+
 /*! \var typedef enum DOCSIS_Esafe_Db_extIf_e
     \brief Type of enable.
 *\n           Needs to be in sync with the enum defined for DOCSIS ESAFE DB.
@@ -401,6 +410,24 @@ void eSafeDevice_GetErouterOperationMode(esafeErouterOperModeExtIf_e *operMode);
 * @retval void.
 */
 void eSafeDevice_SetServiceIntImpact();
+
+/**
+* @brief Set operation status of esafe erouter interface.
+         API should pass the status of the interface.
+*\n  Prototype : void eSafeDevice_SetErouterOperStatus
+        (
+           esafeErouterOperStatus_e operStatus
+        )
+*\n Caller: static void GWP_DisableERouter(void)
+*           static void GWP_EnableERouter(void)
+*
+*
+* @param[in] esafeErouterOperStatus_e operStatus - change interface status to Up/Down
+* @param[out] none.
+* @retval void.
+*/
+void
+eSafeDevice_SetErouterOperStatus(esafeErouterOperStatus_e operStatus);
 
 /** 
 * @brief  Get MAC address of net device name.
