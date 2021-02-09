@@ -1470,6 +1470,9 @@ static void GWP_EnableERouter(void)
 {
 #if !defined(_PLATFORM_RASPBERRYPI_)
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
+    /* Update esafe interface operating status */
+    eSafeDevice_SetErouterOperStatus(DOCESAFE_EROUTER_IFOPERSTATUS_UP);
+
     /* Update ESAFE state */
     GWP_UpdateEsafeAdminMode(eRouterMode);
 
@@ -1534,6 +1537,9 @@ static void GWP_DisableERouter(void)
 {
 #if !defined(_PLATFORM_RASPBERRYPI_)
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
+    /* Update esafe interface operating status */
+    eSafeDevice_SetErouterOperStatus(DOCESAFE_EROUTER_IFOPERSTATUS_DOWN);
+
     /* Update ESAFE state */
     GWP_UpdateEsafeAdminMode(eRouterMode);
 
@@ -3567,11 +3573,13 @@ static int GWP_act_DocsisInited_callback()
     {
         /* Disabled */
         operMode = DOCESAFE_EROUTER_OPER_DISABLED_extIf;
+	eSafeDevice_SetErouterOperStatus(DOCESAFE_EROUTER_IFOPERSTATUS_DOWN);
     }
     else
     {
         /* At this point: enabled, but neither are provisioned (regardless of which is enabled) */
         operMode = DOCESAFE_EROUTER_OPER_NOIPV4_NOIPV6_extIf;
+	eSafeDevice_SetErouterOperStatus(DOCESAFE_EROUTER_IFOPERSTATUS_UP);
     }
         GWPROV_PRINT(" operMode = %d\n", operMode);
     eSafeDevice_SetErouterOperationMode(operMode);
