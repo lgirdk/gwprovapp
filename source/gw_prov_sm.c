@@ -2716,6 +2716,9 @@ static void *GWP_sysevent_threadfunc(void *data)
                 else if (!strcmp(val, "stopped"))
                 { // if WAN down, the zebra need to re-launch to take this change for RA adapting
                     system("service_routed radv-restart");
+                   // dhcp server restart event will regenerate dnsmasq.conf file and restart dnsmasq service.
+                   // DHCP options (lease time, dns_server troubleshoot_wizard(how?) changes) add into dnsmasq.conf file depends on wan_status.             
+                   sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-restart", "1", 0);
                 }
 			}
 			else if (ret_value == IPV6_PREFIX && strlen(val) > 5) {
@@ -2832,7 +2835,9 @@ static int GWP_act_DocsisLinkDown_callback_2()
    #endif
        // dhcp server restart event will regenerate dnsmasq.conf file and restart dnsmasq service.
        // DHCP options (lease time, troubleshoot_wizard changes) add into dnsmasq.conf file depends on wan_status.
-       sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-restart", "1", 0);
+
+       // 20210209: restart dhcp server after wan-status changes to "stopped" in GWP_sysevent_threadfunc().
+       // sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-restart", "1", 0);
     }
 
     if(bridge_mode != 0)//full-bridge or psudo-bridge
