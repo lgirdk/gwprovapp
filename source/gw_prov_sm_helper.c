@@ -61,6 +61,21 @@ static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded);
 #endif
 #endif
 
+#define WIFI_SSID               "Device.WiFi.SSID."
+#define WIFI_ACCESSPOINT        "Device.WiFi.AccessPoint."
+#define WIFI_RADIO              "Device.WiFi.Radio."
+#define WIFI_ATM                "Device.WiFi.X_LGI-COM_ATM.Radio."
+#define WIFI_ATM_SSID_RADIO1    "Device.WiFi.X_LGI-COM_ATM.Radio.1.SSID."
+#define WIFI_ATM_SSID_RADIO2    "Device.WiFi.X_LGI-COM_ATM.Radio.2.SSID."
+
+#define RADIO_1_TR069_INDEX     10000
+#define RADIO_2_TR069_INDEX     10100
+#define RADIO_1_CCSP_INDEX      1
+#define RADIO_2_CCSP_INDEX      2
+
+#define NUMBER_OF_DATA_MODELS   6
+#define MAX_DATAMODEL_SIZE      256
+
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
 static bool gbDmObjectParseCfgDone = false;
@@ -481,6 +496,119 @@ static const char *GW_MapTr69TypeToDmcliType(const char *tr69Type)
     return NULL;
 }
 
+/*
+ * Add handling of Vendor specific TLV 202.43.12 - Data Model Object
+ */
+/**************************************************************************/
+/*! \fn int mapIndex(int i, int index)
+ **************************************************************************
+ *  \brief Map a TR-069 index to a dmcli index
+ *  \param[in] tr69Index - index and i - type of data model
+ *  \return int
+ **************************************************************************/
+
+int mapIndex(int i, int index)
+{
+	int ret  = -1;
+
+	switch (i)
+	{
+		case 0:
+		case 1:
+			/*Device.WiFi.SSID. and Device.WiFi.AccessPoint.
+			  10001~10008 maps to 1,3,5,7,9,11,13,15
+			  10101~10108 maps to 2,4,6,8,10,12,14,16*/
+			if(index >= (RADIO_1_TR069_INDEX + 1) && index <= (RADIO_1_TR069_INDEX + 8))
+				ret =  ((index - RADIO_1_TR069_INDEX) * 2 -1);
+			else if(index >= (RADIO_2_TR069_INDEX + 1) && index <= (RADIO_2_TR069_INDEX + 8))
+				ret =  ((index - RADIO_2_TR069_INDEX)*2);
+			break;
+		case 2:
+		case 3:
+			/*Device.WiFi.Radio. and Device.WiFi.X_LGI-COM_ATM.Radio.
+			  10000 - 1
+			  10100 - 2*/
+			if(index == RADIO_1_TR069_INDEX)
+				ret = RADIO_1_CCSP_INDEX;
+			else if(index == RADIO_2_TR069_INDEX)
+				ret = RADIO_2_CCSP_INDEX;
+			break;
+		case 4:
+			/*Device.WiFi.X_LGI-COM_ATM.Radio.1.SSID.
+			  10001~10008 maps to 1,2,3,4,5,6,7,8*/
+			if(index >= (RADIO_1_TR069_INDEX + 1) && index <= (RADIO_1_TR069_INDEX + 8))
+				ret =  (index - RADIO_1_TR069_INDEX);
+			break;
+		case 5:
+			/*Device.WiFi.X_LGI-COM_ATM.Radio.2.SSID.
+			  10101~10108 maps to 1,2,3,4,5,6,7,8*/
+			if(index >= (RADIO_2_TR069_INDEX + 1) && index <= (RADIO_2_TR069_INDEX + 8))
+				ret =  (index - RADIO_2_TR069_INDEX);
+			break;
+		default:
+			break;
+	}
+	return ret;
+}
+
+/*
+ * Add handling of Vendor specific TLV 202.43.12 - Data Model Object
+ */
+/**************************************************************************/
+/*! \fn int GW_MapTr69IndexToDmcliIndex(const char *tr69Name, char *dmcliName)
+ **************************************************************************
+ *  \brief Map a parameter name with TR-069 index to a parameter name with dmcli index
+ *  \param[in] data model paramters name with tr69Index and place holder for return Name dmcliName
+ *  \return int
+ **************************************************************************/
+
+static int GW_MapTr69IndexToDmcliIndex(const char *tr69Name, char *dmcliName)
+{
+	char indexMap[NUMBER_OF_DATA_MODELS][MAX_DATAMODEL_SIZE] = {WIFI_SSID, WIFI_ACCESSPOINT, WIFI_RADIO, WIFI_ATM, WIFI_ATM_SSID_RADIO1, WIFI_ATM_SSID_RADIO2};
+	char recName[MAX_DATAMODEL_SIZE];
+	int index= 0;
+	int newIndex= 0;
+	int i= 0;
+	char restDmlString[MAX_DATAMODEL_SIZE];
+	int ret = 0;
+	bool atm_ssid_set = false;
+
+	strcpy(recName,tr69Name);
+
+	for(i = 0; i < NUMBER_OF_DATA_MODELS; i++)
+	{
+		if (strncmp(recName, indexMap[i], strlen(indexMap[i])) == 0)
+		{
+			sscanf(&recName[strlen(indexMap[i])],"%d%s",&index,restDmlString);
+
+			if(index == 0)
+				break;
+
+			newIndex = mapIndex(i,index);
+
+			if(newIndex == -1)
+			{
+				ret = -1;
+				break;
+			}
+
+			sprintf(dmcliName,"%s%d%s",indexMap[i],newIndex,restDmlString);
+
+			if(!atm_ssid_set && ((strncmp(dmcliName, WIFI_ATM_SSID_RADIO1, strlen(WIFI_ATM_SSID_RADIO1)) == 0) ||
+			(strncmp(dmcliName, WIFI_ATM_SSID_RADIO2, strlen(WIFI_ATM_SSID_RADIO2)) == 0)))
+			{
+				strcpy(recName,dmcliName);
+				atm_ssid_set = true;
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
 /**************************************************************************/
 /*! \fn bool GW_CheckForErrorStr(FILE *pFile, char *errorStr);
  **************************************************************************
@@ -518,6 +646,8 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
     char cmd[1024];
     bool success = false;
     FILE *result = NULL;
+    char retName[MAX_DATAMODEL_SIZE] = "";
+    int ret = 0;
 
     if (pName == NULL || pType == NULL || pValue == NULL)
     {
@@ -530,9 +660,19 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
         return true;
     }
 
+    if((strncmp(pName, DEVICE_WIFI, strlen(DEVICE_WIFI)) == 0))
+    {
+        ret = GW_MapTr69IndexToDmcliIndex(pName,retName);
+        if(ret == -1)
+            return true;
+    }
+
     /* Call dmcli to apply the parameter. This really needs to be reworked to use d-bus
        transactions directly. That is something for future enhancement. */
-    snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", pName, pType, pValue);
+    if(strlen(retName) != 0)
+        snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", retName, pType, pValue);
+    else
+        snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", pName, pType, pValue);
 
     /* Retry on "Can't find dest component" error to workaround startup timing sensitivity */
     result = popen(cmd, "r");
