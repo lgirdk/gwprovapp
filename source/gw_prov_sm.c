@@ -2852,7 +2852,9 @@ static int GWP_act_DocsisLinkUp_callback()
     printf("\n**************************\n\n");
 
     // LGI ADD BEGIN
-    system("/etc/atom/update_timezone.sh");
+#if defined (_PUMA6_ARM_)
+    system("/etc/update_atom_time.sh");
+#endif
     //if(bridge_mode != 0) //Not limit to bridge mode, since router mode might also start dhcp server (if last_erouter_mode=0)
     {
         char status[16] = {0};
