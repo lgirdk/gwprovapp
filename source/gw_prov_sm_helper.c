@@ -566,7 +566,6 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
             restart_mask |= RESTART_WIFI;
         }
         SaveRestartMask(restart_mask);
-        GWPROV_PRINT(" GW_SetParam success for param -> %s, type -> %s, value -> %s\n", pName, pType, pValue);
     }
 
     return success;
