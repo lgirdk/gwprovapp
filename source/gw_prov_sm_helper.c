@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include <ccsp_base_api.h>
 #include <ccsp_alias_mgr.h>
 #include <ccsp_alias_mgr_helper.h>
 #include <syscfg/syscfg.h>
@@ -46,6 +47,7 @@ typedef struct _DmObject
 } DmObject_t;
 
 int cfgFileRouterMode = -1;
+static void *bus_handle = NULL;
 
 #define MAX_ARGS 20
 #define MAX_LINE_SIZE 512
@@ -54,6 +56,8 @@ int cfgFileRouterMode = -1;
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
 
 #define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
+#define CR_COMPONENT_ID "eRT.com.cisco.spvtg.ccsp.CR"
+#define SUBSYSTEM_PREFIX "eRT."
 
 #define WIFI_SSID               "Device.WiFi.SSID."
 #define WIFI_ACCESSPOINT        "Device.WiFi.AccessPoint."
@@ -72,11 +76,17 @@ int cfgFileRouterMode = -1;
 
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
+static DmObject_t *gpDmObjectHeadAlias = NULL;    /* Sorted list for parameter with object instance number/alias */
 static bool gbDmObjectParseCfgDone = false;
 static int DmObjectSockFds[2];
 
 static void Send_Release(char *file_name);
 static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded);
+static bool init_message_bus(void);
+static bool isAliasMatch(char *object_name, char *parent, char *alias);
+static bool isParentMatch(char *object_name, char *parent);
+static void GW_HandleAliasDmList(void);
+static int getIndex(char *lineOutput, char *parent);
 
 static int SaveRestartMask(unsigned long mask)
 {
@@ -667,9 +677,9 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
     /* Call dmcli to apply the parameter. This really needs to be reworked to use d-bus
        transactions directly. That is something for future enhancement. */
     if(strlen(retName) != 0)
-        snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", retName, pType, pValue);
+        snprintf(cmd, sizeof(cmd), "dmcli eRT true setvalues '%s' %s '%s'", retName, pType, pValue);
     else
-        snprintf(cmd, sizeof(cmd), "dmcli eRT setvalues '%s' %s '%s'", pName, pType, pValue);
+        snprintf(cmd, sizeof(cmd), "dmcli eRT true setvalues '%s' %s '%s'", pName, pType, pValue);
 
     /* Retry on "Can't find dest component" error to workaround startup timing sensitivity */
     result = popen(cmd, "r");
@@ -730,6 +740,79 @@ static void GW_DmObjectListAdd(DmObject_t *pDmObj)
 }
 
 /**************************************************************************/
+/*! \fn void GW_DmObjectAddToAliasList(DmObject_t *pDmObj);
+ **************************************************************************
+ *  \brief Add DataModel parameter with alias to a sorted list
+ *  \param[in] pDmObj - Parameter to add (must be copied)
+ *  \return none
+ **************************************************************************/
+static void GW_DmObjectAddToAliasList(DmObject_t *pDmObj)
+{
+    /* make a copy of the object to store */
+    DmObject_t *pNewDmObj = malloc(sizeof(DmObject_t));
+    /* Pointers for list traverse */
+    DmObject_t *pPrev = NULL;
+    DmObject_t *pCurr = gpDmObjectHeadAlias;
+
+    /* Parse parent object and alias,
+     * which will be added to the list in sorted order
+     */
+    char *object_name = strdup(pDmObj->Name);
+    char *pParent = strtok(object_name, "[");
+    char *pAlias = strtok(NULL, "]");
+    bool matchFound = false;
+
+    if (pNewDmObj != NULL)
+    {
+        memcpy(pNewDmObj, pDmObj, sizeof(DmObject_t));
+        if (gpDmObjectHeadAlias == NULL)
+        {
+            gpDmObjectHeadAlias = pNewDmObj;
+        }
+        else
+        {
+            /* Add the new node in sorted order based on Parent object
+             * and alias for the instance number
+             */
+            while (pCurr)
+            {
+                if (isParentMatch(pCurr->Name, pParent))
+                {
+                    break;
+                }
+                pPrev = pCurr;
+                pCurr = pCurr->pNext;
+            }
+            while (pCurr)
+            {
+                if (!isParentMatch(pCurr->Name, pParent))
+                {
+                    break;
+                }
+                if (isAliasMatch(pCurr->Name, pParent, pAlias))
+                {
+                    matchFound = true;
+                }
+                else
+                {
+                    if (matchFound)
+                        break;
+                }
+                pPrev = pCurr;
+                pCurr = pCurr->pNext;
+            }
+            pNewDmObj->pNext = pCurr;
+            pPrev->pNext = pNewDmObj;
+        }
+    }
+    else
+    {
+        GWPROV_PRINT("Failed to allocate memory for data model object: %s \n", pDmObj->Name);
+    }
+    free(object_name);
+}
+
+/**************************************************************************/
 /*! \fn bool GW_DmObjectListIsEmpty(void);
  **************************************************************************
  *  \brief Determines if DataModel list is empty
@@ -737,7 +820,7 @@ static void GW_DmObjectListAdd(DmObject_t *pDmObj)
  **************************************************************************/
 static bool GW_DmObjectListIsEmpty(void)
 {
-    return (gpDmObjectHead == NULL);
+    return (gpDmObjectHead == NULL && gpDmObjectHeadAlias == NULL);
 }
 
 /**************************************************************************/
@@ -754,18 +837,15 @@ static void GW_DmObjectListApply(void)
     DmObject_t *pPrev = NULL;
     DmObject_t *pCurr = gpDmObjectHead;
 
+    /* Call GW_HandleAliasDmList(), to process gpDmObjectHeadAlias list */
+    GW_HandleAliasDmList();
+
     while (pCurr != NULL)
     {
-        if(pCurr->IsAliasBased)
-        {
-            success = GW_HandleAliasDm(*pCurr, 0);
-        }
-        else
-        {
-            /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
-            for invalid value, etc., but in those cases we don't want to retry because there is no point */
-            success = GW_SetParam(pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
-        }
+        /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
+        for invalid value, etc., but in those cases we don't want to retry because there is no point */
+        success = GW_SetParam(pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+
         if (!success)
         {
             pCurr->FailureCount++;
@@ -920,6 +1000,227 @@ static bool is_customer_data_model (void)
 #endif
 }
 
+static void GW_HandleAliasDmList()
+{
+    componentStruct_t **ppComponents = NULL;
+    DmObject_t *pLastNode = NULL;
+    DmObject_t *pCurr = gpDmObjectHeadAlias;
+    DmObject_t *pCrawl;
+    DmObject_t *pPrev;
+    char *dst_componentid = NULL;
+    char *dst_pathname = NULL;
+    char cmd[1024];
+    char output[1024];
+    int size2 = 0;
+    int idx = -1;
+    bool success = false;
+
+    if (!init_message_bus())
+    {
+        return;
+    }
+
+    while (pCurr != NULL)    /* Outer Loop: runs once for each parent Object */
+    {
+        char *object_name = strdup(pCurr->Name);
+        char *objParent = strtok(object_name, "[");
+        char *cObj, *parent, *alias, *parameterName;
+
+        int ret = CcspBaseIf_discComponentSupportingNamespace(bus_handle, CR_COMPONENT_ID, objParent, SUBSYSTEM_PREFIX, &ppComponents, &size2);
+        if (((ret == CCSP_SUCCESS) && (size2 == 0)) || (ret == CCSP_MESSAGE_BUS_NOT_EXIST)||(ret == CCSP_CR_ERR_UNSUPPORTED_NAMESPACE))
+        {
+            GWPROV_PRINT("can't find destination component for %s\n", objParent);
+            pCrawl = pCurr;
+            while (pCrawl)    /* Remove all the parameters of same parent Object from current list, will be retried in next iteration */
+            {
+                if (!isParentMatch(pCrawl->Name, objParent))
+                {
+                    break;
+                }
+                pCrawl->FailureCount++;
+                if (pCrawl->FailureCount > MAX_DM_OBJ_RETRIES)
+                {
+                    GWPROV_PRINT("Discarding after max retries %s\n", pCrawl->Name);
+                    DmObject_t *pNext = pCrawl->pNext;
+                    free(pCrawl);
+                    pCrawl = pNext;
+
+                    if (!pLastNode)
+                    {
+                        gpDmObjectHeadAlias = pCrawl;
+                    }
+                    else
+                    {
+                        pLastNode->pNext = pCrawl;
+                    }
+                }
+                else {
+                    pLastNode = pCrawl;
+                    pCrawl = pCrawl->pNext;
+                }
+            }
+            pCurr = pCrawl;
+            free(object_name);
+            continue;
+        }
+        dst_componentid = ppComponents[0]->componentName;
+        dst_pathname    = ppComponents[0]->dbusPath;
+
+	/* Get all existing alias for current object */
+        snprintf(cmd, sizeof(cmd), "dmcli eRT true getvalues %s | grep Alias -A1", objParent);
+
+        FILE *fp = popen(cmd, "r");
+        while (fgets(output, sizeof(output), fp) != NULL)
+        {
+            if (strstr(output, objParent))
+            {
+                idx = getIndex(output, objParent);
+                if (idx == -1)
+                {
+                    GWPROV_PRINT("No valid index found %s\n", output);
+                }
+            }
+            else if (strstr(output, "value: ") && idx != -1)
+            {
+                bool matchFound = false;
+                char *pAliasName = strstr(output, "value:") + strlen("value:");
+                while (*pAliasName == ' ')    //trim leading whitespaces
+                    pAliasName++;
+                char *ptr = pAliasName;
+                while (*ptr != '\n' && *ptr != '\0' && *ptr != ' ')    //trim trailing whitespaces
+                    ptr++;
+                *ptr = '\0';
+
+                pCrawl = NULL;
+                pPrev = NULL;
+
+                GWPROV_PRINT("Using idx %d for %s[%s]\n", idx, objParent, pAliasName);
+                while (pCurr)
+                {
+                    DmObject_t *pNext = pCurr->pNext;
+                    cObj = strdup(pCurr->Name);
+                    parent = strtok(cObj, "[");
+                    alias = strtok(NULL, "]");
+                    parameterName = strtok(NULL,"].");
+
+                    if (strcmp(parent, objParent))
+                    {
+                        free(cObj);
+                        break;
+                    }
+                    else
+                    {
+                        if (strcmp(pAliasName, alias) == 0)
+                        {
+                            matchFound = true;
+                            snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
+                            GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+
+                            free(pCurr);
+                            free(cObj);
+                        }
+                        else
+                        {
+                            free(cObj);
+                            if (matchFound)
+                                break;
+
+                            if (!pPrev)
+                                pCrawl = pCurr;
+                            else
+                                pPrev->pNext = pCurr;
+                            pPrev = pCurr;
+                        }
+                        pCurr = pNext;
+                    }
+                }
+                if (pPrev)
+                {
+                    pPrev->pNext = pCurr;
+                    pCurr = pCrawl;
+                }
+            }
+        }
+
+        /* Create new table for entries which are not available in existing list */
+        char *lastAlias = NULL;
+        while (pCurr)
+        {
+            DmObject_t *pNext = pCurr->pNext;
+            cObj = strdup(pCurr->Name);
+            parent = strtok(cObj, "[");
+
+            if (strcmp(parent, objParent) != 0)
+            {
+                free(cObj);
+                break;
+            }
+
+            alias = strtok(NULL, "]");
+            parameterName = strtok(NULL,"].");
+
+            if (!lastAlias || strcmp(lastAlias, alias) != 0)    /* Create object only once for each alias/instance number */
+            {
+                if (lastAlias) {
+                    free(lastAlias);
+                    lastAlias = NULL;
+                }
+
+                ret = CcspBaseIf_AddTblRow(bus_handle, dst_componentid, dst_pathname, 0, parent, &idx);
+                if (ret == CCSP_SUCCESS)
+                {
+                    GWPROV_PRINT("Added idx %d for %s[%s]\n", idx, objParent, alias);
+                    snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, idx);
+                    GW_SetParam(cmd, "string", alias);
+                    lastAlias = strdup(alias);
+                }
+                else
+                {
+                    GWPROV_PRINT("Unable to create object %s, ret=%d\n", parent, ret);
+                }
+            }
+
+            if (ret == CCSP_SUCCESS)
+            {
+                snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
+                GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+            }
+
+            free(pCurr);
+            free(cObj);
+            pCurr = pNext;
+        }
+        if (!pLastNode)
+        {
+            gpDmObjectHeadAlias = pCurr;
+        }
+        else
+        {
+            pLastNode->pNext = pCurr;
+        }
+
+        while( size2 && ppComponents)
+        {
+            if (ppComponents[size2-1]->remoteCR_dbus_path)
+                AnscFreeMemory(ppComponents[size2-1]->remoteCR_dbus_path);
+
+            if (ppComponents[size2-1]->remoteCR_name)
+                AnscFreeMemory(ppComponents[size2-1]->remoteCR_name);
+
+            if ( ppComponents[size2-1]->componentName )
+                AnscFreeMemory( ppComponents[size2-1]->componentName );
+
+            if ( ppComponents[size2-1]->dbusPath )
+                AnscFreeMemory( ppComponents[size2-1]->dbusPath );
+
+            AnscFreeMemory(ppComponents[size2-1]);
+
+            size2--;
+        }
+        free(object_name);
+    }
+}
+
 /**************************************************************************/
 /*! \fn bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
  **************************************************************************
@@ -1044,12 +1345,10 @@ static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
     }
 
 out:
-
     if(objectListAddNeeded)
     {
-        GW_DmObjectListAdd(&dmObject);
+        GW_DmObjectAddToAliasList(&dmObject);
     }
-
     free(object_name);
 
     return return_value;
@@ -1098,7 +1397,7 @@ static void *GW_DmObjectThread(void *pParam)
            to process; otherwise, timeout after 1 second so we can retry processing the list  */
         struct timeval tval;
         struct timeval *pTval = NULL;
-        if (!GW_DmObjectListIsEmpty())
+        if (!GW_DmObjectListIsEmpty() && gbDmObjectParseCfgDone)
         {
             tval.tv_sec = 1;
             tval.tv_usec = 0;
@@ -1122,6 +1421,21 @@ static void *GW_DmObjectThread(void *pParam)
                just set the config done flag */
             if (!strcmp(tlvData, TLV2024312_CONFIG_DONE))
             {
+#if DEBUG
+                GWPROV_PRINT("Objects in the list: \n");
+                DmObject_t *pCrawl = gpDmObjectHead;
+                while (pCrawl) {
+                    GWPROV_PRINT("%s\n", pCrawl->Name);
+                    pCrawl = pCrawl->pNext;
+                }
+
+                pCrawl = gpDmObjectHeadAlias;
+                while (pCrawl)
+                {
+                    GWPROV_PRINT("%s\n", pCrawl->Name);
+                    pCrawl = pCrawl->pNext;
+                }
+#endif
                 gbDmObjectParseCfgDone = true;
             }
             else
@@ -1185,28 +1499,20 @@ static void *GW_DmObjectThread(void *pParam)
                 {
                     GWPROV_PRINT("Processing a [Alias] based TLV202.43 object : %s \n", dmObject.Name);
                     dmObject.IsAliasBased = true;
-                    GW_HandleAliasDm(dmObject, 1);
+                    GW_DmObjectAddToAliasList(&dmObject);
                 }
                 else {
                     GWPROV_PRINT("Processing a TLV202.43 object : %s \n", dmObject.Name);
-                }
-
-                /* Alias based TLV202.43.12 objects are handled in GW_HandleAliasDm. */
-                if(!dmObject.IsAliasBased)
-                {
-                    /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
-                    for invalid value, etc., but in those cases we don't want to retry because there is no point */
-                    if (!GW_SetParam(dmObject.Name, pTypeDmcli, dmObject.Value))
-                    {
-                        dmObject.FailureCount++;
-                        GW_DmObjectListAdd(&dmObject);
-                    }
+                    GW_DmObjectListAdd(&dmObject);
                 }
             }
         }
 
         /* if there was no new TLV to process, try to handle our queued list */
-        else if (!GW_DmObjectListIsEmpty())
+	/* Since majority of the datamodel parameters are in PandM module,
+	 * Added wait for PandM to be initialized before trying to set the parameters.
+	 */
+        else if (!GW_DmObjectListIsEmpty() && access("/tmp/pam_initialized", F_OK) == 0)
         {
             GW_DmObjectListApply();
         }
@@ -1301,3 +1607,52 @@ static void Send_Release(char *file_name)
     return;
 }
 
+static bool init_message_bus(void)
+{
+    char *pCfg = CCSP_MSG_BUS_CFG;
+    if (!bus_handle)
+    {
+        int ret = CCSP_Message_Bus_Init("ccsp.gwprov", pCfg, &bus_handle, (CCSP_MESSAGE_BUS_MALLOC)Ansc_AllocateMemory_Callback, Ansc_FreeMemory_Callback);
+        if (ret == -1)
+        {
+            GWPROV_PRINT("Failed to initialize message bus \n");
+            bus_handle = NULL;
+            return false;
+        }
+    }
+    return true;
+}
+
+static int getIndex(char *lineOutput, char *parent)
+{
+    char *ptr = strstr(lineOutput, parent);
+    int idx = 0;
+
+    if (!ptr)
+        return -1;
+
+    ptr += strlen(parent);
+    while (*ptr != '.')
+    {
+        idx = idx * 10 + (*ptr - '0');
+        ptr++;
+    }
+    return idx;
+}
+
+static bool isParentMatch(char *object_name, char *parent)
+{
+    char *ptr = strstr(object_name, parent);
+    if (!ptr || ptr[strlen(parent)] != '[')
+        return false;
+    return true;
+}
+
+static bool isAliasMatch(char *object_name, char *parent, char *alias)
+{
+    char param[1024];
+    snprintf(param, sizeof(param), "%s[%s]", parent, alias);
+    if (strstr(object_name, param) == NULL)
+        return false;
+    return true;
+}
