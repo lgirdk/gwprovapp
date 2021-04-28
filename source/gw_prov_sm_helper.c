@@ -1039,21 +1039,10 @@ static void GW_HandleAliasDmList()
         {
             GWPROV_PRINT("can't find destination component for %s\n", objParent);
             pCrawl = pCurr;
-            pPrev = NULL;
             while (pCrawl)    /* Remove all the parameters of same parent Object from current list, will be retried in next iteration */
             {
                 if (!isParentMatch(pCrawl->Name, objParent))
                 {
-                    if (!pLastNode)
-                    {
-                        gpDmObjectHeadAlias = pCurr;
-                    }
-                    else
-                    {
-                        pLastNode->pNext = pCurr;
-                    }
-                    pLastNode = pPrev;
-                    pLastNode->pNext = NULL;
                     break;
                 }
                 pCrawl->FailureCount++;
@@ -1063,9 +1052,18 @@ static void GW_HandleAliasDmList()
                     DmObject_t *pNext = pCrawl->pNext;
                     free(pCrawl);
                     pCrawl = pNext;
+
+                    if (!pLastNode)
+                    {
+                        gpDmObjectHeadAlias = pCrawl;
+                    }
+                    else
+                    {
+                        pLastNode->pNext = pCrawl;
+                    }
                 }
                 else {
-                    pPrev = pCrawl;
+                    pLastNode = pCrawl;
                     pCrawl = pCrawl->pNext;
                 }
             }
