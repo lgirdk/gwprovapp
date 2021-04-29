@@ -27,9 +27,9 @@
 #include <time.h>
 
 #include <ccsp_base_api.h>
-#include <ccsp_alias_mgr.h>
-#include <ccsp_alias_mgr_helper.h>
+#include <custom_alias_utils.h>
 #include <syscfg/syscfg.h>
+#include <ansc_platform.h>
 
 #include "gw_prov_sm.h"
 #include "gw_prov_sm_helper.h"
@@ -55,7 +55,6 @@ static void *bus_handle = NULL;
 #define DHCPV4_PID_FILE "/var/run/eRT_ti_udhcpc.pid"
 #define DHCPV6_PID_FILE "/var/run/erouter_dhcp6c.pid"
 
-#define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
 #define CR_COMPONENT_ID "eRT.com.cisco.spvtg.ccsp.CR"
 #define SUBSYSTEM_PREFIX "eRT."
 
@@ -1341,20 +1340,11 @@ out:
  **************************************************************************/
 static void *GW_DmObjectThread(void *pParam)
 {
-    ANSC_HANDLE aliasMgr;
+    int alias_mapper_enabled = 1;
     char *internalName;
 
     /* copy to local buffer so we can manipulate it */
     char tlvData[GW_SUBTLV_VENDOR_SPECIFIC_DATAMODEL_OBJECT_MAX_LEN + 1];
-
-    aliasMgr = CcspAliasMgrInitialize();
-
-    if (!CcspAliasMgrLoadMappingFile(aliasMgr, ALIAS_MANAGER_MAPPER_FILE))
-    {
-        printf("gw-prov-app: Failed to load alias mapping file %s\n", ALIAS_MANAGER_MAPPER_FILE);
-        CcspAliasMgrFree(aliasMgr);
-        aliasMgr = NULL;
-    }
 
     while (1)
     {
@@ -1445,15 +1435,17 @@ static void *GW_DmObjectThread(void *pParam)
                     continue;
                 }
 
-                if (aliasMgr != NULL)
+                if (alias_mapper_enabled)
                 {
-                    internalName = CcspAliasMgrGetFirstInternalName(aliasMgr, dmObject.Name);
-
+                    int relMem = 0;
+                    internalName = aliasGetInternalName(dmObject.Name, &relMem);
                     if (internalName)
                     {
                         printf("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", dmObject.Name, internalName);
                         strncpy(dmObject.Name, internalName, sizeof(dmObject.Name) - 1);
-                        AnscFreeMemory(internalName);
+                        dmObject.Name[sizeof(dmObject.Name)-1] = '\0';
+                        if (relMem)
+                            AnscFreeMemory(internalName);
                     }
                 }
 
@@ -1498,10 +1490,6 @@ static void *GW_DmObjectThread(void *pParam)
         }
     }
 
-    if (aliasMgr)
-    {
-        CcspAliasMgrFree(aliasMgr);
-    }
 
     return NULL;
 }
