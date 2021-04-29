@@ -14,6 +14,12 @@
  * limitations under the License.
  **********************************************************************/
 
+/*
+   Define CCSP_ALIAS_MGR to use the original RDKB Alias Manager APIs.
+   Leave undefined to use the (experimental) new replacements.
+*/
+//#define CCSP_ALIAS_MGR 1
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -27,9 +33,14 @@
 #include <time.h>
 
 #include <ccsp_base_api.h>
+#ifdef CCSP_ALIAS_MGR
 #include <ccsp_alias_mgr.h>
 #include <ccsp_alias_mgr_helper.h>
+#else
+#include <custom_alias_utils.h>
+#endif
 #include <syscfg/syscfg.h>
+#include <ansc_platform.h>
 
 #include "gw_prov_sm.h"
 #include "gw_prov_sm_helper.h"
@@ -1365,7 +1376,12 @@ out:
  **************************************************************************/
 static void *GW_DmObjectThread(void *pParam)
 {
+#ifdef CCSP_ALIAS_MGR
     ANSC_HANDLE aliasMgr = NULL;         // AliasManager handle for DataModel names' aliasing
+#else
+    int alias_mapper_enabled = 0;
+#endif
+
     char *internalName;
 
     /* copy to local buffer so we can manipulate it */
@@ -1373,6 +1389,7 @@ static void *GW_DmObjectThread(void *pParam)
 
     if (is_customer_data_model())
     {
+#ifdef CCSP_ALIAS_MGR
         aliasMgr = CcspAliasMgrInitialize();
 
         if (!CcspAliasMgrLoadMappingFile(aliasMgr, ALIAS_MANAGER_MAPPER_FILE))
@@ -1385,6 +1402,9 @@ static void *GW_DmObjectThread(void *pParam)
         {
             printf("gw-prov-app: customer data-model %s successfully loaded\n", ALIAS_MANAGER_MAPPER_FILE);
         }
+#else
+        alias_mapper_enabled = 1;
+#endif
     }
 
     while (1)
@@ -1476,6 +1496,7 @@ static void *GW_DmObjectThread(void *pParam)
                     continue;
                 }
 
+#ifdef CCSP_ALIAS_MGR
                 if (aliasMgr != NULL)
                 {
                     internalName = CcspAliasMgrGetFirstInternalName(aliasMgr, dmObject.Name);
@@ -1487,6 +1508,21 @@ static void *GW_DmObjectThread(void *pParam)
                         AnscFreeMemory(internalName);
                     }
                 }
+#else
+                if (alias_mapper_enabled)
+                {
+                    int relMem = 0;
+                    internalName = aliasGetInternalName(dmObject.Name, &relMem);
+                    if (internalName)
+                    {
+                        printf("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", dmObject.Name, internalName);
+                        strncpy(dmObject.Name, internalName, sizeof(dmObject.Name) - 1);
+                        dmObject.Name[sizeof(dmObject.Name)-1] = '\0';
+                        if (relMem)
+                            AnscFreeMemory(internalName);
+                    }
+                }
+#endif
 
                 /* convert TR069 type to dmcli type */
                 const char *pTypeDmcli = GW_MapTr69TypeToDmcliType(dmObject.Type);
@@ -1529,10 +1565,12 @@ static void *GW_DmObjectThread(void *pParam)
         }
     }
 
+#ifdef CCSP_ALIAS_MGR
     if (aliasMgr)
     {
         CcspAliasMgrFree(aliasMgr);
     }
+#endif
 
     return NULL;
 }
