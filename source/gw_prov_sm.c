@@ -191,6 +191,9 @@ void GWPROV_PRINT(const char *format, ...)
 #define ETHWAN_FILE     "/nvram/ETHWAN_ENABLE"
 #endif
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
 #if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
 static void _get_shell_output (FILE *fp, char *buf, int len);
 #endif
@@ -1569,7 +1572,7 @@ static void GWP_EnterBridgeMode(void)
     // GSWT_ResetSwitch();
     //DOCSIS_ESAFE_SetEsafeProvisioningStatusProgress(DOCSIS_EROUTER_INTERFACE, ESAFE_PROV_STATE_NOT_INITIATED);
 	char MocaStatus[16]  = {0};
-        char BridgeMode[2] = {0};
+        char BridgeMode[12];
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
 	GWPROV_PRINT(" MoCA_current_status = %s \n", MocaStatus);
@@ -3279,8 +3282,7 @@ static int GWP_act_DocsisCfgfile_callback(char* cfgFile)
 
     //LGI ADD START
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "Started", 0);
-    snprintf(cmdstr, sizeof(cmdstr), "sysevent set %s %u", RESTART_MODULE, RESTART_NONE);
-    system(cmdstr);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, STR(RESTART_NONE), 0);
     //LGI ADD END
 
 #if defined (_COSA_BCM_ARM_)
@@ -3527,7 +3529,7 @@ static int GWP_act_DocsisInited_callback()
     Uint8 lladdr[ NETUTILS_IPv6_GLOBAL_ADDR_LEN / sizeof(Uint8) ] = {0};
     Uint8 soladdr[ NETUTILS_IPv6_GLOBAL_ADDR_LEN / sizeof(Uint8) ] = {0};
     char soladdrKey[64] = { 0 };
-    char BridgeMode[2] = {0};
+    char BridgeMode[12];
     /* Coverity Issue Fix - CID:73933 : UnInitialised variable */
     char soladdrStr[64] = {0};
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
@@ -3707,7 +3709,7 @@ static int GWP_act_DocsisInited_callback()
 **************************************************************************/
 static int GWP_act_ProvEntry_callback()
 {
-    char BridgeMode[2] = {0};
+    char BridgeMode[12];
 #if defined(_PLATFORM_RASPBERRYPI_)
     int uid = 0;
     uid = getuid();
@@ -3795,7 +3797,8 @@ if( uid == 0 )
 
     if (sysevent_fd >= 0)
     {
-        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "phylink_wan_state", "down", 0);
+        /* Fixme: sysevent_fd_gs not ready yet, use sysevent_fd instead? */
+        sysevent_set(sysevent_fd, sysevent_token, "phylink_wan_state", "down", 0);
         GWPROV_PRINT(" Creating Thread  GWP_sysevent_threadfunc \n"); 
         pthread_create(&sysevent_tid, NULL, GWP_sysevent_threadfunc, NULL);
     }
@@ -3868,7 +3871,7 @@ if ( uid == 0 )
 #endif
 
 #ifdef MULTILAN_FEATURE
-    char sysevent_cmd[80] = { 0 };
+    char sysevent_cmd[80];
     /* Update LAN side base mac address */
     getNetworkDeviceMacAddress(&macAddr);
     snprintf(sysevent_cmd, sizeof(sysevent_cmd), "%02x:%02x:%02x:%02x:%02x:%02x",
