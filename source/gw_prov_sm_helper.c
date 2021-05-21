@@ -58,7 +58,7 @@ static int SaveRestartMask(unsigned long mask)
 {
     unsigned long restart_mask = RESTART_NONE;
     char restart_module[32] = {0};
-    char cmd[256];
+    char cmask[12];
 
     sysevent_get(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, restart_module, sizeof(restart_module));
     if ( strlen(restart_module) > 0 )
@@ -66,8 +66,8 @@ static int SaveRestartMask(unsigned long mask)
         restart_mask = strtoul(restart_module, NULL, 10);
     }
     restart_mask |= mask;
-    snprintf(cmd, sizeof(cmd), "sysevent set %s %u", RESTART_MODULE, restart_mask);
-    system(cmd);
+    snprintf(cmask, sizeof(cmask), "%u", restart_mask);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, cmask, 0);
 
     return 0;
 }
@@ -76,7 +76,7 @@ int RestartServicesPerMask(void)
 {
     unsigned long restart_mask = RESTART_NONE;
     char restart_module[32] = {0};
-    char cmd[256];
+    char cmask[12];
 
     sysevent_get(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, restart_module, sizeof(restart_module));
     if ( strlen(restart_module) > 0 )
@@ -95,8 +95,8 @@ int RestartServicesPerMask(void)
             system("dmcli eRT setv Device.WiFi.Radio.1.X_CISCO_COM_ApplySetting bool true");
             system("dmcli eRT setv Device.WiFi.Radio.2.X_CISCO_COM_ApplySetting bool true");
         }
-        snprintf(cmd, sizeof(cmd), "sysevent set %s %u", RESTART_MODULE, RESTART_NONE);
-        system(cmd);
+        snprintf(cmask, sizeof(cmask), "%u", RESTART_NONE);
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, cmask, 0);
     }
 
     return 0;
@@ -409,7 +409,7 @@ int GWP_act_ErouterSnmpInitModeSet_callback(void)
         Send_Release(DHCPV6_PID_FILE);
         sleep(5);
         // Below event reboot-triggered is to avoid resetting of wireless radios during CM reboot.
-        system("sysevent set reboot-triggered 1");
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "reboot-triggered", "1", 0);
         GWP_UpdateERouterMode();
         sleep(5);
         system("reboot"); // Reboot on change of device mode.

@@ -199,6 +199,9 @@ void GWPROV_PRINT(const char *format, ...)
 #define ETHWAN_FILE     "/nvram/ETHWAN_ENABLE"
 #endif
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
 #if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
 static void _get_shell_output (FILE *fp, char *buf, int len);
 #endif
@@ -1561,7 +1564,7 @@ static void GWP_EnterBridgeMode(void)
 #if !defined (NO_MOCA_FEATURE_SUPPORT)
 	char MocaStatus[16]  = {0};
 #endif
-	char BridgeMode[2] = {0};
+	char BridgeMode[12];
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
 #if !defined (NO_MOCA_FEATURE_SUPPORT)
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
@@ -3237,8 +3240,7 @@ static int GWP_act_DocsisCfgfile_callback(char *cfgFile)
     cfgFileRouterMode = -1; // in case there is no TLV202.1 in cfg file
 
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "Started", 0);
-    snprintf(cmdstr, sizeof(cmdstr), "sysevent set %s %u", RESTART_MODULE, RESTART_NONE);
-    system(cmdstr);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, STR(RESTART_NONE), 0);
 
 #if defined (_COSA_BCM_ARM_)
 #ifdef HEX_DEBUG
@@ -3481,7 +3483,7 @@ static int GWP_act_DocsisInited_callback (void)
     unsigned char lladdr[ NETUTILS_IPv6_GLOBAL_ADDR_LEN ] = {0};
     unsigned char soladdr[ NETUTILS_IPv6_GLOBAL_ADDR_LEN ] = {0};
     char soladdrKey[64] = { 0 };
-    char BridgeMode[2] = {0};
+    char BridgeMode[12];
     /* Coverity Issue Fix - CID:73933 : UnInitialised variable */
     char soladdrStr[64] = {0};
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
@@ -3660,7 +3662,7 @@ static int GWP_act_DocsisInited_callback (void)
 **************************************************************************/
 static int GWP_act_ProvEntry_callback (void)
 {
-    char BridgeMode[2] = {0};
+    char BridgeMode[12];
 #if defined(_PLATFORM_RASPBERRYPI_)
     int uid = 0;
     uid = getuid();
