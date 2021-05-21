@@ -169,6 +169,9 @@
 #define ETHWAN_FILE     "/nvram/ETHWAN_ENABLE"
 #endif
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
 static Tr69TlvData *tlvObject=NULL;
 static int objFlag = 1;
 
@@ -1232,15 +1235,15 @@ static TlvParseCallbackStatusExtIf_e GW_setTopologyMode(Uint8 type, Uint16 lengt
 {
     Uint8 tpMode = *value;
     TlvParseCallbackStatusExtIf_e st = TLV_PARSE_CALLBACK_OK_EXTIF;
-    char cmd[64] = {0};
+    char mode[64] = {0};
 
     printf("TLV %d, Len %d : Topology Mode\n", type, length);
     GWPROV_PRINT(" %s : type %d, length %d , tpMode %d\n", __FUNCTION__, type, length,tpMode);
     if ( (tpMode == TLV202_42_FAVOR_DEPTH) || (tpMode == TLV202_42_FAVOR_WIDTH))
     {
         printf("eSafe CFG file : Found Topology Mode, val %d\n", tpMode);
-        snprintf(cmd, sizeof(cmd), "sysevent set erouter_topology-mode %d", tpMode);
-        system(cmd);
+        snprintf(mode, sizeof(mode), "%d", tpMode);
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "erouter_topology-mode", mode, 0);
     }
     else
     {
@@ -1447,7 +1450,6 @@ static void GWP_EnableERouter(void)
 //Actually enter router mode
 static void GWP_EnterRouterMode(void)
 {
-         char sysevent_cmd[80] = {0};
          /* Coverity Issue Fix - CID:71381 : UnInitialised varible */
 	char MocaPreviousStatus[16] = {0};
        	int prev;
@@ -1460,8 +1462,7 @@ static void GWP_EnterRouterMode(void)
 //     DOCSIS_ESAFE_SetEsafeProvisioningStatusProgress(DOCSIS_EROUTER_INTERFACE, ESAFE_PROV_STATE_IN_PROGRESS);
 
 //    bridge_mode = 0;
-    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", BRMODE_ROUTER);
-    system(sysevent_cmd);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", STR(BRMODE_ROUTER), 0);
 	syscfg_get(NULL, "MoCA_previous_status", MocaPreviousStatus, sizeof(MocaPreviousStatus));
 	prev = atoi(MocaPreviousStatus);
 	GWPROV_PRINT(" MocaPreviousStatus = %d \n", prev);
@@ -1476,7 +1477,7 @@ static void GWP_EnterRouterMode(void)
 
     system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
     
-    system("sysevent set forwarding-restart");
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
 
 /**************************************************************************/
@@ -1524,7 +1525,7 @@ static void GWP_EnterBridgeMode(void)
     /* Reset Switch, to remove all VLANs */ 
     // GSWT_ResetSwitch();
     //DOCSIS_ESAFE_SetEsafeProvisioningStatusProgress(DOCSIS_EROUTER_INTERFACE, ESAFE_PROV_STATE_NOT_INITIATED);
-    char sysevent_cmd[80] = {0};
+    char br_mode[80] = {0};
 	char MocaStatus[16]  = {0};
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
@@ -1541,11 +1542,11 @@ static void GWP_EnterBridgeMode(void)
 	    }
 	}
 	system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
-    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", active_mode);
-    system(sysevent_cmd);
+    snprintf(br_mode, sizeof(br_mode), "%d", active_mode);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", br_mode, 0);
     system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
     
-    system("sysevent set forwarding-restart");
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
 
 static void GWP_EnterPseudoBridgeMode(void)
@@ -1578,10 +1579,9 @@ char MocaStatus[16] = {0};
 	}	
 	
 	system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");	
-    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", BRMODE_PRIMARY_BRIDGE);
-    system(sysevent_cmd);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", STR(BRMODE_PRIMARY_BRIDGE), 0);
     system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
-    system("sysevent set forwarding-restart");
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
 
 /**************************************************************************/
@@ -1713,7 +1713,7 @@ void GWP_UpdateERouterMode(void)
 #endif
                 if(!once)
                     check_lan_wan_ready();
-                system("sysevent set erouter_mode-updated");
+		sysevent_set(sysevent_fd_gs, sysevent_token_gs, "erouter_mode-updated", "", 0);
             }
         }
     }
@@ -2715,7 +2715,7 @@ static int GWP_act_DocsisLinkDown_callback_2()
            otherwise the sysevent tr_erouter0_dhcpv6_client_v6addr won't
            be triggered if the erouter0 get the same IPv6 address when link up.
            The DSLite also need to be stopped when link down, and will be started when link up*/
-           system("sysevent set tr_erouter0_dhcpv6_client_v6addr");
+           sysevent_set(sysevent_fd_gs, sysevent_token_gs, "tr_erouter0_dhcpv6_client_v6addr", "",0);
            /*Clear the IPv6 rules that maybe block the DHCPv6 response when link up, those rules will
            be updated once erouter got the IPv6 address*/
            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "firewall-restart", "",0);
@@ -2724,9 +2724,9 @@ static int GWP_act_DocsisLinkDown_callback_2()
        printf("Stopping wan service\n");
        GWPROV_PRINT(" Stopping wan service\n");
        t2_event_d("RF_ERROR_WAN_stop", 1);
-       system("sysevent set wan-stop");
+       sysevent_set(sysevent_fd_gs, sysevent_token_gs, "wan-stop", "",0);
    #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
-       system("sysevent set dhcpv6_client-stop");
+       sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcpv6_client-stop", "",0);
    #endif
        // LGI ADD - START
        // dhcp server restart event will regenerate dnsmasq.conf file and restart dnsmasq service.
@@ -3145,8 +3145,7 @@ static int GWP_act_DocsisCfgfile_callback(char* cfgFile)
     oldRouterMode = eRouterMode;     //LGI MOVED
     //LGI ADD START
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "Started", 0);
-    snprintf(cmdstr, sizeof(cmdstr), "sysevent set %s %u", RESTART_MODULE, RESTART_NONE);
-    system(cmdstr);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, STR(RESTART_NONE), 0);
     //LGI ADD END
 
     if( cfgFile != NULL)
@@ -3161,7 +3160,7 @@ static int GWP_act_DocsisCfgfile_callback(char* cfgFile)
        goto gimReply;
     }
 
-    v_secure_system("sysevent set docsis_cfg_file %s", cfgFileName);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "docsis_cfg_file", cfgFileName, 0);
 
     printf("sysevent set docsis_cfg_file %s\n", cfgFileName);
 
@@ -3252,7 +3251,7 @@ gimReply:
     if (tlvStatus == TLV_OK_extIf)
     {
         //Notifying the CcspPandM and CcspTr069 module that the TLV parsing is successful and done
-        system("sysevent set TLV202-status success");
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "TLV202-status", "success", 0);
     }
     //LGI ADD START
     else
@@ -3434,9 +3433,9 @@ static int GWP_act_DocsisInited_callback()
     sysevent_bridge_mode = getSyseventBridgeMode(eRouterMode, bridge_mode);
     active_mode = sysevent_bridge_mode;
 	GWPROV_PRINT(" active_mode %d \n", active_mode);
-    char sysevent_cmd[80];
-    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", sysevent_bridge_mode);
-    system(sysevent_cmd);
+    char br_mode[80];
+    snprintf(br_mode, sizeof(br_mode), "%d", sysevent_bridge_mode);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", br_mode, 0);
 #endif
   
 #if !defined(_PLATFORM_RASPBERRYPI_)
@@ -3460,7 +3459,7 @@ static int GWP_act_DocsisInited_callback()
     }
 #endif
 
-      system("sysevent set docsis-initialized 1");
+      sysevent_set(sysevent_fd_gs, sysevent_token_gs, "docsis-initialized", "1", 0);
 #if !defined(_PLATFORM_RASPBERRYPI_)
 
     /* Must set the ESAFE Enable state before replying to the DocsisInit event */
@@ -3652,7 +3651,7 @@ if( uid == 0 )
 
     if (sysevent_fd >= 0)
     {
-        system("sysevent set phylink_wan_state down");
+	sysevent_set(sysevent_fd, sysevent_token, "phylink_wan_state", "down", 0);
         GWPROV_PRINT(" Creating Thread  GWP_sysevent_threadfunc \n"); 
         pthread_create(&sysevent_tid, NULL, GWP_sysevent_threadfunc, NULL);
     }
@@ -3715,8 +3714,8 @@ if ( uid == 0 )
 #endif
 
     char sysevent_cmd[80] = { 0 };
-    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", sysevent_bridge_mode);
-    system(sysevent_cmd);
+    snprintf(sysevent_cmd, sizeof(sysevent_cmd), "%d", sysevent_bridge_mode);
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", sysevent_cmd, 0);
 
     /* Now that we have the ICC que (SME) and we are registered on the docsis INIT    */
     /* event, we can notify PCD to continue                                           */
