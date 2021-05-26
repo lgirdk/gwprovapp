@@ -2189,6 +2189,9 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif
 
     sysevent_set_options(sysevent_fd, sysevent_token, "system-restart", TUPLE_FLAG_EVENT);
+
+    sysevent_set_options(sysevent_fd, sysevent_token, "cfgfile_apply", TUPLE_FLAG_EVENT);
+
     GWPROV_PRINT(" Set notifications done \n");    
 //     sysevent_get(sysevent_fd, sysevent_token, "homesecurity_lan_l3net", buf, sizeof(buf));
 //     if (buf[0] != '\0' && atoi(buf))
