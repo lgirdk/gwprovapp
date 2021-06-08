@@ -2510,7 +2510,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 #if defined (_PROPOSED_BUG_FIX_)
                     GWPROV_PRINT("***STARTING LAN***\n");
 #endif
-
+                    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "refresh-switch", "true", 0);
                     LAN_start();
                  }
                 netids_inited = 1;
