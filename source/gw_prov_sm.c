@@ -2426,7 +2426,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 #if defined (_PROPOSED_BUG_FIX_)
                     GWPROV_PRINT("***STARTING LAN***\n");
 #endif
-
+                    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "refresh-switch", "true", 0);
                     LAN_start();
                  }
                 netids_inited = 1;
@@ -2473,9 +2473,9 @@ static void *GWP_sysevent_threadfunc(void *data)
                         //Piggy back off the webui start event to signal XHS startup
                         sysevent_get(sysevent_fd_gs, sysevent_token_gs, "homesecurity_lan_l3net", buf, sizeof(buf));
                         if (buf[0] != '\0') sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", buf, 0);
+                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
 #endif
                         // LGI ADD - START - for multinet
-                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET4_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET5_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET6_INSTANCE, 0);
