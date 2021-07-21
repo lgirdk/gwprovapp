@@ -2476,6 +2476,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif
                         // LGI ADD - START - for multinet
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
+#ifdef _PUMA6_ARM_
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET4_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET5_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET6_INSTANCE, 0);
@@ -2483,6 +2484,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET8_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET9_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET10_INSTANCE, 0);
+#endif
                         // LGI ADD - END
                     }
 #ifdef MULTILAN_FEATURE
