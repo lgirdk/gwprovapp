@@ -359,11 +359,9 @@ static int GWPEthWan_SysCfgGetInt(const char *name)
 
 static int GWPETHWAN_SysCfgSetInt(const char *name, int int_value)
 {
-   char value[20];
+   GWPROV_PRINT(" %s : name = %s , value = %d \n", __FUNCTION__, name, int_value);
 
-   snprintf(value,sizeof(value),"%d", int_value);
-   GWPROV_PRINT(" %s : name = %s , value = %s \n", __FUNCTION__, name, value);
-   return syscfg_set(NULL, name, value);
+   return syscfg_set_u(NULL, name, int_value);
 }
 
 void validate_mode(int* bridge_mode)
