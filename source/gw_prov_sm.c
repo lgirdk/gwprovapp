@@ -141,6 +141,8 @@
 #define COMP_NAME "LOG.RDK.GWPROV"
 #define LOG_INFO 4
 #define TLV_ACS_URL_FILE "/var/tmp/acs-url-tlv-202.txt"
+#define DNSMASQ_CONF "/var/dnsmasq.conf"
+#define DNSMASQ_LEASEFILE "/nvram/dnsmasq.leases"
 
 #ifdef MULTILAN_FEATURE
 /* Syscfg keys used for calculating mac addresses of local interfaces and bridges */
@@ -1550,8 +1552,16 @@ static void GWP_DisableERouter(void)
 //     snprintf(sysevent_cmd, sizeof(sysevent_cmd), "sysevent set bridge_mode %d", bridge_mode);
 //     system(sysevent_cmd);
 //     system("sysevent set forwarding-restart");
-    
-    
+
+    v_secure_system("killall `basename dnsmasq`");
+
+    if( access( DNSMASQ_CONF, F_OK ) == 0 ) {
+         unlink(DNSMASQ_CONF);
+    }
+    if( access( DNSMASQ_LEASEFILE, F_OK ) == 0 ) {
+         unlink(DNSMASQ_LEASEFILE);
+    }
+
     GWP_EnterBridgeMode();
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static");
 
@@ -1690,10 +1700,10 @@ void GWP_UpdateERouterMode(void)
 #endif
 
             // LGI ADD START
-            GWP_IssueCmdWithTimeout("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset", "value", 60);
+            GWP_IssueCmdWithTimeout("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset", "value", 120);
             // LGI ADD END
 
-            GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
+            GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 60);
 
             GWP_DisableERouter();
             
