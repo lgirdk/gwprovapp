@@ -2729,6 +2729,24 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif
 // LGI ADD - END
                     system("/etc/utopia/port_bridging.sh restart &");
+                    
+                    char client_enable[5];
+
+                    syscfg_get("arddnsclient_1", "enable", client_enable, sizeof(client_enable));
+                    if (strcmp(client_enable, "1") == 0)
+                    {
+                        char curr_wan_ipaddr[64];
+                        char prev_wan_ipaddr[64];
+
+                        curr_wan_ipaddr[0] = 0;
+                        sysevent_get(sysevent_fd_gs, sysevent_token_gs, "current_wan_ipaddr", curr_wan_ipaddr, sizeof(curr_wan_ipaddr));
+                        syscfg_get(NULL, "wan_last_ipaddr", prev_wan_ipaddr, sizeof(prev_wan_ipaddr));
+                        if (strcmp(curr_wan_ipaddr, prev_wan_ipaddr) != 0)
+                        {
+                            printf("Erouter IP changed: restart DDNS service\n");
+                            system("service_ddns restart &");
+                        }
+                    }
 
                                  }
 
