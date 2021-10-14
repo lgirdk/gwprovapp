@@ -2059,6 +2059,19 @@ static void check_lan_wan_ready()
 			}
 		}
 	}
+
+	// Re starting samknows speed test once wan and lan status is ready
+	if (once && (GWP_SysCfgGetInt("skenable") == 1))
+	{
+#if defined(_PUMA6_ARM_)
+		system("rpcclient2 'sh /etc/init.d/skclient.sh restart >/dev/null &'");
+#else
+		if (access("/tmp/samknows/unitid", F_OK) != 0)
+		{
+			system("/etc/init.d/samknows_ispmon restart &");
+		}
+#endif
+	}
 }
 #if defined(_PLATFORM_RASPBERRYPI_)
 /**************************************************************************/
