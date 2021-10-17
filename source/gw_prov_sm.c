@@ -2727,7 +2727,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                         pthread_create(&sysevent_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
                     }
 #endif
-#if defined(_LG_MV2_PLUS_)
+
                     if (GWP_SysCfgGetInt("skenable") == 1)
                     {
                         if (access("/tmp/samknows/unitid", F_OK) != 0)
@@ -2735,7 +2735,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                             system("/etc/init.d/samknows_ispmon restart &");
                         }
                     }
-#endif
 // LGI ADD - END
                     system("/etc/utopia/port_bridging.sh restart &");
                     
