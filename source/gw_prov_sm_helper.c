@@ -1074,9 +1074,12 @@ static void GW_HandleAliasDmList()
                 while (*pAliasName == ' ')    //trim leading whitespaces
                     pAliasName++;
                 char *ptr = pAliasName;
-                while (*ptr != '\n' && *ptr != '\0' && *ptr != ' ')    //trim trailing whitespaces
+                while (*ptr != '\n' && *ptr != '\0')    //trim trailing whitespaces
                     ptr++;
                 *ptr = '\0';
+                ptr--;
+                if(*ptr == ' ')
+                    *ptr = '\0';
 
                 pCrawl = NULL;
                 pPrev = NULL;
@@ -1099,9 +1102,35 @@ static void GW_HandleAliasDmList()
                     {
                         if (strcmp(pAliasName, alias) == 0)
                         {
-                            matchFound = true;
-                            snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
-                            GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+                            char *remaining = strtok(NULL, "");
+                            if (remaining)
+                            {
+                                /*
+                                    If it is a nested Alias object, resolve the first alias and
+                                    add it to gpDmObjectHeadAlias for further processing.
+                                */
+                                if (strstr(remaining, "["))
+                                {
+                                    DmObject_t nestedAliasObject;
+                                    memset(&nestedAliasObject, 0, sizeof(DmObject_t));
+                                    sprintf(nestedAliasObject.Name, "%s%d.%s.%s",parent, idx, parameterName, remaining);
+                                    strcpy(nestedAliasObject.Value, pCurr->Value);
+                                    strcpy(nestedAliasObject.Type, pCurr->Type);
+                                    nestedAliasObject.IsAliasBased = true;
+                                    GWPROV_PRINT("Nested [Alias] TLV202.43 object full name : %s\n", nestedAliasObject.Name);
+                                    GW_DmObjectAddToAliasList(&nestedAliasObject);
+                                    if(pNext == NULL)
+                                    {
+                                        pNext = pCurr->pNext;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                matchFound = true;
+                                snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
+                                GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+                            }
 
                             free(pCurr);
                             free(cObj);
