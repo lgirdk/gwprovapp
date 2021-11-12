@@ -1531,9 +1531,7 @@ int main(int argc, char *argv[])
 
     t2_init("ccsp-gwprovapp");
 
-
     #ifdef FEATURE_SUPPORT_RDKLOG
-       setenv("LOG4C_RCPATH","/rdklogger",1);
        rdk_logger_init(DEBUG_INI_NAME);
     #endif
 
