@@ -2586,7 +2586,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                 }
 #endif
 
-#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_)) && defined (COMMUNITY_WIFI_ENABLE)
+#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
                 eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
                 /*If the GW is IPv6 only mode, start the hotspot only after the IPv6 address ready*/
                 if (eRouterMode==2) {
@@ -2603,7 +2603,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 						check_lan_wan_ready();
 					}
 // LGI ADD - START
-#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_)) && defined (COMMUNITY_WIFI_ENABLE)
+#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
 
                     eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
                     /*If the GW is IPv4 only mode or Dual-Stack mode, try to start the hotspot after the IPv4 WAN ready.
