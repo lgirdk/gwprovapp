@@ -2725,6 +2725,28 @@ static void *GWP_sysevent_threadfunc(void *data)
                         pthread_create(&sysevent_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
                     }
 #endif
+
+                    char rip_status[8];
+                    char erouter_static_ip_enable[8];
+                    char erouter_static_ip_address[20];
+                    /*
+                        During bootup, cannot assign static ip to erouter0:0 from PandM.
+                        So if rip and erouter_static_ip are enabled then assign the static
+                        IP to erouter0:0 from here instead.
+                    */
+                    if ((syscfg_get(NULL, "rip_enabled", rip_status, sizeof(rip_status)) == 0) &&
+                        (strcmp(rip_status, "1") == 0))
+                    {
+                        if ((syscfg_get(NULL, "erouter_static_ip_enable", erouter_static_ip_enable, sizeof(erouter_static_ip_enable)) == 0) &&
+                            (strcmp(erouter_static_ip_enable, "true") == 0))
+                        {
+                            if (syscfg_get(NULL, "erouter_static_ip_address", erouter_static_ip_address, sizeof(erouter_static_ip_address)) == 0)
+                            {
+                                v_secure_system("ip addr add %s/32 brd 255.255.255.255 dev erouter0 label erouter0:0", erouter_static_ip_address);
+                            }
+                        }
+                    }
+
 // LGI ADD - END
                     system("/etc/utopia/port_bridging.sh restart &");
 
