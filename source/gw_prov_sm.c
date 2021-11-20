@@ -1518,6 +1518,7 @@ static void GWP_EnterRouterMode(void)
 		v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
 	}
 
+    v_secure_system("dmcli eRT setv Device.WiFi.X_RDK-CENTRAL_COM_ForceDisable bool false");
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
     
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
@@ -1595,6 +1596,7 @@ static void GWP_EnterBridgeMode(void)
     v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
     snprintf(br_mode, sizeof(br_mode), "%d", active_mode);
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", br_mode, 0);
+    v_secure_system("dmcli eRT setv Device.WiFi.X_RDK-CENTRAL_COM_ForceDisable bool true");
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
     
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
