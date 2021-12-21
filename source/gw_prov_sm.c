@@ -2080,6 +2080,15 @@ static void check_lan_wan_ready()
 			}
 		}
 	}
+
+#if defined(_PUMA6_ARM_)
+	// Re starting samknows speed test once wan and lan status is ready
+	if (once && (GWP_SysCfgGetInt("skenable") == 1))
+	{
+		system("rpcclient2 'sh /etc/init.d/skclient.sh restart >/dev/null &'");
+	}
+#endif
+
 }
 #if defined(_PLATFORM_RASPBERRYPI_)
 /**************************************************************************/
@@ -2728,6 +2737,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                     }
 #endif
 
+#if !defined(_PUMA6_ARM_)
                     if (GWP_SysCfgGetInt("skenable") == 1)
                     {
                         if (access("/tmp/samknows/unitid", F_OK) != 0)
@@ -2735,6 +2745,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                             system("/etc/init.d/samknows_ispmon restart &");
                         }
                     }
+#endif
 // LGI ADD - END
                     system("/etc/utopia/port_bridging.sh restart &");
                     
