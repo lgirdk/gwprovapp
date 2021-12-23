@@ -1271,7 +1271,6 @@ static int GWP_act_ProvEntry()
     errno_t rc       = -1;
     int     ind      = -1;
  
-    syscfg_init();
     if (0 != GWP_SysCfgGetInt("bridge_mode"))
     {
         bridgeModeInBootup = 1;
