@@ -1310,7 +1310,6 @@ static int GWP_act_ProvEntry()
     char sysevent_cmd[80];
     int sysevent_bridge_mode = 0;
 
-    syscfg_init();
     if (0 != GWP_SysCfgGetInt("bridge_mode"))
     {
         bridgeModeInBootup = 1;
