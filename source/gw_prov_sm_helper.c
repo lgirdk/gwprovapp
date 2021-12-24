@@ -1129,6 +1129,17 @@ static void GW_HandleAliasDmList()
                             {
                                 matchFound = true;
                                 snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
+
+                                int relMem = 0;
+                                char *internalName = aliasGetInternalName(cmd, &relMem);
+                                if (internalName)
+                                {
+                                    GWPROV_PRINT("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", cmd, internalName);
+                                    snprintf(cmd, sizeof(cmd), "%s", internalName);
+                                    if (relMem)
+                                        AnscFreeMemory(internalName);
+                                }
+
                                 GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
                             }
 
@@ -1200,6 +1211,17 @@ static void GW_HandleAliasDmList()
             if (ret == CCSP_SUCCESS)
             {
                 snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, idx, parameterName);
+
+                int relMem = 0;
+                char *internalName = aliasGetInternalName(cmd, &relMem);
+                if (internalName)
+                {
+                    GWPROV_PRINT("gw-prov-app: replacing TLV202.43.12 parameter %s with internal name %s\n", cmd, internalName);
+                    snprintf(cmd, sizeof(cmd), "%s", internalName);
+                    if (relMem)
+                        AnscFreeMemory(internalName);
+                }
+
                 GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
             }
 
