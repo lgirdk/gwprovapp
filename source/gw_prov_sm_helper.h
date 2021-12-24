@@ -18,7 +18,6 @@
 #define  _GW_PROV_SM_HELPER_H
 
 #include <sysevent/sysevent.h>
-#include <sys_types.h>
 #include "gw_prov_abstraction.h"
 
 // for multinet
