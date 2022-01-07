@@ -4099,10 +4099,6 @@ static void LAN_start(void)
     if (bridge_mode == 0 && eRouterMode != 0) // mipieper - add erouter check for pseudo bridge. Can remove if bridge_mode is forced in response to erouter_mode.
     {
         printf("Utopia starting lan...\n");
-        GWPROV_PRINT(" Setting lan-start event \n");           
-        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "lan-start", "", 0);
-        
-        
     } else {
         // TODO: fix this
         printf("Utopia starting bridge...\n");
