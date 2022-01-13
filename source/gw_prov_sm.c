@@ -3914,15 +3914,8 @@ static void LAN_start(void)
     }
 
 #ifdef DSLITE_FEATURE_SUPPORT
-    {
-        char buf[2];
-
-        if ((syscfg_get(NULL, "4_to_6_enabled", buf, sizeof(buf)) == 0) && (strcmp(buf, "1") == 0))
-        {
-            GWPROV_PRINT("Setting dslite_enabled event\n");
-            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dslite_enabled", "1", 0);
-        }
-    }
+    GWPROV_PRINT("Setting dslite_enabled event\n");
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dslite_enabled", "1", 0);
 #endif
 
     //ADD MORE LAN NETWORKS HERE
