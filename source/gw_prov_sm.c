@@ -3961,9 +3961,10 @@ static void LAN_start(void)
     if (bridge_mode == 0 && eRouterMode != 0) // mipieper - add erouter check for pseudo bridge. Can remove if bridge_mode is forced in response to erouter_mode.
     {
         printf("Utopia starting lan...\n");
-        GWPROV_PRINT(" Setting dhcp_server-resync event \n");
-        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-resync", "", 0);
-
+        GWPROV_PRINT(" Setting lan-start event \n");           
+        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "lan-start", "", 0);
+        
+        
     } else {
         // TODO: fix this
         printf("Utopia starting bridge...\n");
@@ -3976,6 +3977,10 @@ static void LAN_start(void)
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dslite_enabled", "1", 0);
 #endif
 
+    //ADD MORE LAN NETWORKS HERE
+    GWPROV_PRINT(" Setting dhcp_server-resync event \n");     
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "dhcp_server-resync", "", 0);
+   
 	/* TODO: OEM to implement swctl apis */
 
     if(gDocTftpOk) {
