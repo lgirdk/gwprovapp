@@ -481,24 +481,10 @@ int GWP_act_ErouterSnmpInitModeSet_callback(void)
         {
             GWPROV_PRINT(("RDKB_REBOOT : RebootDevice syscfg_set failed erouter mode change\n"));
         }
-        else
-        {
-            if (syscfg_commit() != 0)
-            {
-                GWPROV_PRINT(("RDKB_REBOOT : RebootDevice syscfg_commit failed erouter mode change\n"));
-            }
-        }
 
-        if (syscfg_set(NULL, "X_RDKCENTRAL-COM_LastRebootCounter", "1") != 0)
+        if (syscfg_set_commit(NULL, "X_RDKCENTRAL-COM_LastRebootCounter", "1") != 0)
         {
             GWPROV_PRINT(("syscfg_set failed\n"));
-        }
-        else
-        {
-            if (syscfg_commit() != 0)
-            {
-                GWPROV_PRINT(("syscfg_commit failed\n"));
-            }
         }
 
         sleep(5);
