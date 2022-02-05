@@ -466,16 +466,9 @@ static void GWPEthWan_EnterBridgeMode(void)
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
     GWPROV_PRINT(" MoCA_current_status = %s \n", MocaStatus);
-    if ((syscfg_set(NULL, "MoCA_previous_status", MocaStatus) != 0))
+    if ((syscfg_set_commit(NULL, "MoCA_previous_status", MocaStatus) != 0))
     {
         printf("syscfg_set failed\n");
-    }
-    else
-    {
-        if (syscfg_commit() != 0)
-        {
-            printf("syscfg_commit failed\n");
-        }
     }
     v_secure_system("ccsp_bus_client_tool eRT setv Device.MoCA.Interface.1.Enable bool false");
     snprintf(BridgeMode, sizeof(BridgeMode), "%d", active_mode);
@@ -1368,19 +1361,11 @@ static int GWP_act_ProvEntry()
                 {
                     GWPROV_PRINT("eth_wan_enabled syscfg failed\n");
                 }
-                else
-                {
-                    if (syscfg_commit() != 0)
-                    {
-                        GWPROV_PRINT("eth_wan_enabled syscfg_commit\n");
-
-                    }
-                }
             }
         }
-        v_secure_system("syscfg set last_wan_mode 1"); // to handle Factory reset case (1 = Ethwan mode)
-        v_secure_system("syscfg set curr_wan_mode 1"); // to handle Factory reset case (1 = Ethwan mode)
-        v_secure_system("syscfg commit");
+
+        syscfg_set(NULL, "last_wan_mode", "1");        // to handle Factory reset case (1 = Ethwan mode)
+        syscfg_set_commit(NULL, "curr_wan_mode", "1"); // to handle Factory reset case (1 = Ethwan mode)
         ethwan_enabled = 1;
     }
     else
@@ -1398,17 +1383,9 @@ static int GWP_act_ProvEntry()
             GWPROV_PRINT("last wan mode is ethernet but nvram file not available !\n");
             GWPROV_PRINT("Update last wan mode as unknown\n");
             snprintf(buf, sizeof(buf), "%d", WAN_MODE_UNKNOWN);
-            if (syscfg_set(NULL, "last_wan_mode", buf) != 0)
+            if (syscfg_set_commit(NULL, "last_wan_mode", buf) != 0)
             {
                 GWPROV_PRINT("last_wan_mode syscfg failed\n");
-            }
-            else
-            {
-                if (syscfg_commit() != 0)
-                {
-                    GWPROV_PRINT("last_wan_mode syscfg_commit\n");
-
-                }
             }
         }
     }
@@ -1431,17 +1408,9 @@ static int GWP_act_ProvEntry()
     GWPROV_PRINT(" EthWanInterfaceName: %s \n", ethwan_ifname );
 
 #if defined (_BRIDGE_UTILS_BIN_) && !defined (_WNXL11BWL_PRODUCT_REQ_)
-    if ( syscfg_set( NULL, "eth_wan_iface_name", ethwan_ifname ) != 0 )
+    if ( syscfg_set_commit( NULL, "eth_wan_iface_name", ethwan_ifname ) != 0 )
     {
         GWPROV_PRINT( "syscfg_set failed for eth_wan_iface_name\n" );
-    }
-    else
-    {
-        if ( syscfg_commit() != 0 )
-        {
-            GWPROV_PRINT( "syscfg_commit failed for eth_wan_iface_name\n" );
-        }
-
     }
 #endif
 
