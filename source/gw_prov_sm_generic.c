@@ -441,16 +441,9 @@ static void GWPEthWan_EnterBridgeMode(void)
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
     GWPROV_PRINT(" MoCA_current_status = %s \n", MocaStatus);
-    if ((syscfg_set(NULL, "MoCA_previous_status", MocaStatus) != 0))
+    if ((syscfg_set_commit(NULL, "MoCA_previous_status", MocaStatus) != 0))
     {
         printf("syscfg_set failed\n");
-    }
-    else
-    {
-        if (syscfg_commit() != 0)
-        {
-            printf("syscfg_commit failed\n");
-        }
     }
     v_secure_system("ccsp_bus_client_tool eRT setv Device.MoCA.Interface.1.Enable bool false");
     v_secure_system("sysevent set bridge_mode %d",active_mode);
@@ -1305,17 +1298,9 @@ static int GWP_act_ProvEntry()
 
            if((ind==0) && (rc == EOK))
            {
-               if (syscfg_set(NULL, "eth_wan_enabled", "true") != 0)
+               if (syscfg_set_commmit(NULL, "eth_wan_enabled", "true") != 0)
                {
                    GWPROV_PRINT("eth_wan_enabled syscfg failed\n");
-               }
-               else
-               {
-                   if (syscfg_commit() != 0)
-                   {
-                       GWPROV_PRINT("eth_wan_enabled syscfg_commit\n");
-
-                   }
                }
            }
        }
@@ -1342,17 +1327,9 @@ static int GWP_act_ProvEntry()
         GWPROV_PRINT(" EthWanInterfaceName: %s \n", ethwan_ifname );
 
         #if defined (_BRIDGE_UTILS_BIN_)
-            if ( syscfg_set( NULL, "eth_wan_iface_name", ethwan_ifname ) != 0 )
+            if ( syscfg_set_commit( NULL, "eth_wan_iface_name", ethwan_ifname ) != 0 )
             {
                 GWPROV_PRINT( "syscfg_set failed for eth_wan_iface_name\n" );
-            }
-            else
-            {
-                if ( syscfg_commit() != 0 )
-                {
-                    GWPROV_PRINT( "syscfg_commit failed for eth_wan_iface_name\n" );
-                }
-
             }
         #endif
 
