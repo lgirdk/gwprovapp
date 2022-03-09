@@ -2084,14 +2084,18 @@ static void check_lan_wan_ready()
 		}
 	}
 
-#if defined(_PUMA6_ARM_)
 	// Re starting samknows speed test once wan and lan status is ready
 	if (once && (GWP_SysCfgGetInt("skenable") == 1))
 	{
+#if defined(_PUMA6_ARM_)
 		system("rpcclient2 'sh /etc/init.d/skclient.sh restart >/dev/null &'");
-	}
+#else
+		if (access("/tmp/samknows/unitid", F_OK) != 0)
+		{
+			system("/etc/init.d/samknows_ispmon restart &");
+		}
 #endif
-
+	}
 }
 #if defined(_PLATFORM_RASPBERRYPI_)
 /**************************************************************************/
@@ -2738,16 +2742,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                     {
                         /*Create a thread to wait for the IPv6 address ready, at most wait for 30s if no IPv6 address got*/
                         pthread_create(&sysevent_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
-                    }
-#endif
-
-#if !defined(_PUMA6_ARM_)
-                    if (GWP_SysCfgGetInt("skenable") == 1)
-                    {
-                        if (access("/tmp/samknows/unitid", F_OK) != 0)
-                        {
-                            system("/etc/init.d/samknows_ispmon restart &");
-                        }
                     }
 #endif
 
