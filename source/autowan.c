@@ -206,9 +206,12 @@ int GetCurrentWanMode()
 
 void SetCurrentWanMode(int mode)
 {
+    char buf[8];
+    memset(buf, 0, sizeof(buf));
     g_CurrentWanMode = mode;
     AUTO_WAN_LOG("%s Set Current WanMode = %s\n",__FUNCTION__, WanModeStr(g_CurrentWanMode)); 
-    if (syscfg_set_u(NULL, "curr_wan_mode", g_CurrentWanMode) != 0)
+    snprintf(buf, sizeof(buf), "%d", g_CurrentWanMode);
+    if (syscfg_set(NULL, "curr_wan_mode", buf) != 0)
     {
             AUTO_WAN_LOG("syscfg_set failed for curr_wan_mode\n");
     }
@@ -229,9 +232,12 @@ int GetSelectedWanMode()
 
 void SelectedWanMode(int mode)
 {
+    char buf[8];
     g_SelectedWanMode = mode;
     AUTO_WAN_LOG("%s Set  SelectedWanMode = %s\n",__FUNCTION__, WanModeStr(g_SelectedWanMode));
-        if (syscfg_set_u(NULL, "selected_wan_mode", mode) != 0)
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf), "%d", mode);
+        if (syscfg_set(NULL, "selected_wan_mode", buf) != 0)
         {
             AUTO_WAN_LOG("syscfg_set failed for curr_wan_mode\n");
         }
@@ -252,9 +258,12 @@ int GetLastKnownWanMode()
 
 void SetLastKnownWanMode(int mode)
 {
+    char buf[8];
     g_LastKnowWanMode = mode;
     AUTO_WAN_LOG("%s Set Last Known WanMode = %s\n",__FUNCTION__, WanModeStr(g_LastKnowWanMode));
-        if (syscfg_set_u(NULL, "last_wan_mode", mode) != 0)
+    memset(buf, 0, sizeof(buf));
+    snprintf(buf, sizeof(buf), "%d", mode);
+        if (syscfg_set(NULL, "last_wan_mode", buf) != 0)
         {
             AUTO_WAN_LOG("syscfg_set failed for last_wan_mode\n");
         }
@@ -1008,6 +1017,10 @@ CosaDmlEthWanSetEnable
 
     if ( RETURN_OK == CcspHalExtSw_setEthWanEnable( bEnable ) ) 
     {
+        //pthread_t tid;        
+        char buf[ 8 ];
+        memset( buf, 0, sizeof( buf ) );
+        snprintf( buf, sizeof( buf ), "%s", bEnable ? "true" : "false" );
         if(bEnable)
         {
             v_secure_system("touch /nvram/ETHWAN_ENABLE");
@@ -1017,7 +1030,7 @@ CosaDmlEthWanSetEnable
             v_secure_system("rm /nvram/ETHWAN_ENABLE");
         }
 
-        if ( syscfg_set( NULL, "eth_wan_enabled", bEnable ? "true" : "false") != 0 )
+        if ( syscfg_set( NULL, "eth_wan_enabled", buf ) != 0 )
         {
             AUTO_WAN_LOG( "syscfg_set failed for eth_wan_enabled\n" );
             return RETURN_ERR;
@@ -1042,6 +1055,8 @@ void AutoWan_BkupAndReboot()
 {
 
 /* Set the reboot reason */
+                        char buf[8];
+                        snprintf(buf,sizeof(buf),"%d",1);
                         if (syscfg_set(NULL, "X_RDKCENTRAL-COM_LastRebootReason", "WAN_Mode_Change") != 0)
                         {
                                 AUTO_WAN_LOG("RDKB_REBOOT : RebootDevice syscfg_set failed GUI\n");
@@ -1055,7 +1070,7 @@ void AutoWan_BkupAndReboot()
                         }
 
 
-                        if (syscfg_set(NULL, "X_RDKCENTRAL-COM_LastRebootCounter", "1") != 0)
+                        if (syscfg_set(NULL, "X_RDKCENTRAL-COM_LastRebootCounter", buf) != 0)
                         {
                                 AUTO_WAN_LOG("syscfg_set failed\n");
                         }
