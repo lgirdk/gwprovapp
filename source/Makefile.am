@@ -32,7 +32,7 @@ endif
 gw_prov_utopia_CPPFLAGS = -I$(srcdir)/include
 gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/dbus-1.0 -I${PKG_CONFIG_SYSROOT_DIR}$(libdir)/dbus-1.0/include
 
-gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog -lsecure_wrapper
+gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog -ltelemetry_msgsender -lsecure_wrapper -lpthread
 
 if !PLATFORM_RASPBERRYPI_ENABLED
 if !FEATURE_RDKB_WAN_MANAGER
