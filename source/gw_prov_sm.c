@@ -2672,7 +2672,30 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif 
 
                         // LGI ADD - START - for multinet
-                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
+                        bool guest_enable = true;
+#ifdef _COSA_BCM_ARM_
+                        // Disable guest network interface if w10.3 and w11.3 are false (0)
+                        buf[0] = '\0';
+                        GWP_Util_get_shell_output("nvram get wl0.3_bss_enabled", buf, sizeof(buf));
+                        if (strcmp(buf, "0") == 0)
+                        {
+                            buf[0] = '\0';
+                            GWP_Util_get_shell_output("nvram get wl1.3_bss_enabled", buf, sizeof(buf));
+                            if (strcmp(buf, "0") == 0)
+                            {
+                                guest_enable = false;
+                            }
+                        }
+#endif
+                        if (!guest_enable)
+                        {
+                            GWPROV_PRINT("%s Skip enabling guest network interface brlan7 during bootup \n", __FUNCTION__);
+                        }
+                        else
+                        {
+                            GWPROV_PRINT("%s Enable guest network interface brlan7 \n", __FUNCTION__);
+                            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET3_INSTANCE, 0);
+                        }
 #ifdef _PUMA6_ARM_
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET4_INSTANCE, 0);
                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", LGI_SUBNET5_INSTANCE, 0);
