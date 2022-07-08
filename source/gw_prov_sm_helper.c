@@ -113,24 +113,6 @@ static bool isParentMatch(char *object_name, char *parent);
 static void GW_HandleAliasDmList(void);
 static int getIndex(char *lineOutput, char *parent);
 
-static int SaveRestartMask(unsigned long mask)
-{
-    unsigned long restart_mask = RESTART_NONE;
-    char restart_module[32] = {0};
-    char cmask[12];
-
-    sysevent_get(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, restart_module, sizeof(restart_module));
-    if ( strlen(restart_module) > 0 )
-    {
-        restart_mask = strtoul(restart_module, NULL, 10);
-    }
-    restart_mask |= mask;
-    snprintf(cmask, sizeof(cmask), "%u", restart_mask);
-    sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, cmask, 0);
-
-    return 0;
-}
-
 int RestartServicesPerMask(void)
 {
     unsigned long restart_mask = RESTART_NONE;
@@ -723,21 +705,6 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
     {
         success = !GW_CheckForErrorStr(result, "Can't find destination component");
         pclose(result);
-    }
-    /* keep a flag if we ever set a WiFi param so we can apply settings later */
-    if (success)
-    {
-        unsigned long restart_mask = RESTART_NONE;
-        if ( strncmp(pName, DEVICE_HOTSPOT, sizeof(DEVICE_HOTSPOT)-1) == 0 )
-        {
-             restart_mask |= RESTART_HOTSPOT;
-             restart_mask |= RESTART_WIFI;
-        }
-        if ( strncmp(pName, DEVICE_WIFI, sizeof(DEVICE_WIFI)-1) == 0 )
-        {
-            restart_mask |= RESTART_WIFI;
-        }
-        SaveRestartMask(restart_mask);
     }
 
     return success;
