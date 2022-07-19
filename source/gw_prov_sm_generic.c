@@ -545,17 +545,6 @@ static void GWPEthWan_ProcessUtopiaRestart(void)
 
 }
 
-int IsFileExists(const char *fname)
-{
-    FILE *file;
-    if ((file = fopen(fname, "r")))
-    {
-        fclose(file);
-        return 1;
-    }
-    return 0;
-}
-
 #define TR069PidFile "/var/tmp/CcspTr069PaSsp.pid"
 #ifdef FALSE
  #undef FALSE
