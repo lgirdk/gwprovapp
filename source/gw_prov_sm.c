@@ -482,14 +482,11 @@ static void GW_Local_PrintHexStringToStderr(Uint8 *str, Uint16 len)
  }
 #endif
 
-int IsFileExists(const char *fname)
+static int IsFileExists (const char *fname)
 {
-    FILE *file;
-    if ((file = fopen(fname, "r")))
-    {
-        fclose(file);
+    if (access(fname, F_OK) == 0)
         return 1;
-    }
+
     return 0;
 }
 
