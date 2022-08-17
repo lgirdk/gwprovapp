@@ -345,6 +345,7 @@ static token_t sysevent_token;
 int sysevent_fd_gs;
 token_t sysevent_token_gs;
 static pthread_t sysevent_tid;
+static pthread_t hotspot_tid;
 #if defined(_PLATFORM_RASPBERRYPI_)
 static pthread_t linkstate_tid;
 static pthread_t lxcserver_tid;
@@ -369,6 +370,26 @@ static int sIPv4_acquired = 0;
 /**************************************************************************/
 static void GWP_EnterBridgeMode(void);
 static void GWP_EnterRouterMode(void);
+
+static bool isHotspotEnabled (void)
+{
+    FILE *fp;
+
+    char buf[2];
+
+    fp = v_secure_popen("r", "psmcli get dmsb.hotspot.enable");
+
+    _get_shell_output(fp, buf, sizeof(buf));
+
+    buf[1] = '\0';
+
+    if (buf[0] == '1')
+    {
+        return true;
+    }
+
+    return false;
+}
 
 static eGwpThreadType Get_GwpThreadType(char *name)
 {
@@ -2754,8 +2775,12 @@ static void *GWP_sysevent_threadfunc(void *data)
 #if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
                 eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
                 /*If the GW is IPv6 only mode, start the hotspot only after the IPv6 address ready*/
-                if (eRouterMode==2) {
-                    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
+                if (eRouterMode==2) 
+                {
+                    if (isHotspotEnabled())
+                    {
+                         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "gre-forceRestart", "1", 0);
+                    }
                 }
 #endif
             }
@@ -2768,7 +2793,6 @@ static void *GWP_sysevent_threadfunc(void *data)
 						check_lan_wan_ready();
 					}
 #if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
-                    eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
                     /*If the GW is IPv4 only mode or Dual-Stack mode, try to start the hotspot after the IPv4 WAN ready.
                     Explanation for the special cases on dual stack mode:
                     1) If both IPv4 and IPv6 adress can be got, start the hotspot here after IPv4 WAN ready
@@ -2776,13 +2800,24 @@ static void *GWP_sysevent_threadfunc(void *data)
                     start the hotspot
                     3) If IPv4 address not able to get, the IPv6 address won't be got(because the DHCPv6 client starts only after the IPv4 WAN ready)
                     that means gw won't work if without IPv4 address, no need to start the hotspot at this case.*/
-                    if (eRouterMode==1) {
-                        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
-                    }
-                    else if(eRouterMode==3)
+
+                    /*Create a thread to wait for the IPv6 address ready, at most wait for 30s if no IPv6 address got*/
+                    if (isHotspotEnabled())
                     {
-                        /*Create a thread to wait for the IPv6 address ready, at most wait for 30s if no IPv6 address got*/
-                        pthread_create(&sysevent_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
+                        eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
+                        if (eRouterMode == 3)
+                        {
+                           if (hotspot_tid)
+                           {
+                               pthread_cancel(hotspot_tid);
+                               hotspot_tid = 0;		       
+                           }
+                           pthread_create(&hotspot_tid, NULL, GWP_start_hotspot_threadfunc, NULL);
+                        }
+                        else if (eRouterMode == 1)
+                        {
+                           sysevent_set(sysevent_fd_gs, sysevent_token_gs, "gre-forceRestart", "1", 0);
+                        } 
                     }
 #endif
 
