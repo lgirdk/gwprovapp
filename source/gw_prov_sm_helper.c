@@ -130,16 +130,18 @@ int RestartServicesPerMask(void)
     }
     if ( restart_mask != RESTART_NONE )
     {
-        if ( restart_mask & RESTART_HOTSPOT )
-        {
-            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
-        }
-        /* Note: Keep WIFI module as the last one */
         if ( restart_mask & RESTART_WIFI )
         {
             system("dmcli eRT setv Device.WiFi.Radio.1.X_CISCO_COM_ApplySetting bool true");
             system("dmcli eRT setv Device.WiFi.Radio.2.X_CISCO_COM_ApplySetting bool true");
         }
+
+        //hotspot-restart internally sets the Device.X_COMCAST-COM_GRE.Tunnel.{i}.Enable parameter, No driver restart is needed after hotspot restart. 
+        if ( restart_mask & RESTART_HOTSPOT )
+        {
+            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
+        }
+
         snprintf(cmask, sizeof(cmask), "%u", RESTART_NONE);
         sysevent_set(sysevent_fd_gs, sysevent_token_gs, RESTART_MODULE, cmask, 0);
     }
@@ -350,6 +352,8 @@ void *GWP_start_hotspot_threadfunc(void *data)
     int timeout = 30;
     char erouter_ipv6[64];
 
+    pthread_detach(pthread_self());
+
     while(--timeout >= 0)
     {
         erouter_ipv6[0] = 0;
@@ -357,7 +361,7 @@ void *GWP_start_hotspot_threadfunc(void *data)
         if (erouter_ipv6[0] != 0)
         {
             fprintf(stderr,"=========eRouter IPv6 address got: %s=========\n", erouter_ipv6);
-            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "hotspot-restart", "", 0);
+            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "gre-forceRestart", "1", 0);
             break;
         }
         sleep(1);
@@ -718,9 +722,8 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
         if ( strncmp(pName, DEVICE_HOTSPOT, sizeof(DEVICE_HOTSPOT)-1) == 0 )
         {
              restart_mask |= RESTART_HOTSPOT;
-             restart_mask |= RESTART_WIFI;
         }
-        if ( strncmp(pName, DEVICE_WIFI, sizeof(DEVICE_WIFI)-1) == 0 )
+        else if ( strncmp(pName, DEVICE_WIFI, sizeof(DEVICE_WIFI)-1) == 0 )
         {
             restart_mask |= RESTART_WIFI;
         }
