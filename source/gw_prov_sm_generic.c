@@ -468,10 +468,10 @@ static void GWPEthWan_EnterBridgeMode(void)
     {
         printf("syscfg_set failed\n");
     }
-    v_secure_system("ccsp_bus_client_tool eRT setv Device.MoCA.Interface.1.Enable bool false");
+    v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
     snprintf(BridgeMode, sizeof(BridgeMode), "%d", active_mode);
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", BridgeMode, 0);
-    v_secure_system("ccsp_bus_client_tool eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
+    v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
 
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
@@ -492,14 +492,14 @@ static void GWPEthWan_EnterRouterMode(void)
     GWPROV_PRINT(" MocaPreviousStatus = %d \n", prev);
     if(prev == 1)
     {
-        v_secure_system("ccsp_bus_client_tool eRT setv Device.MoCA.Interface.1.Enable bool true");
+        v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool true");
     }
     else
     {
-        v_secure_system("ccsp_bus_client_tool eRT setv Device.MoCA.Interface.1.Enable bool false");
+        v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
     }
 
-    v_secure_system("ccsp_bus_client_tool eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
+    v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
 
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
