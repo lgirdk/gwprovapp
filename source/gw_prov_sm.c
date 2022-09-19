@@ -202,7 +202,7 @@ void GWPROV_PRINT(const char *format, ...)
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-#if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
+#if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_) || defined(_LG_OFW_)
 static void _get_shell_output (FILE *fp, char *buf, int len);
 #endif
 
@@ -2738,7 +2738,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                 }
 #endif
 
-#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
                 eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
                 /*If the GW is IPv6 only mode, start the hotspot only after the IPv6 address ready*/
                 if (eRouterMode==2) 
@@ -2748,7 +2747,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                          sysevent_set(sysevent_fd_gs, sysevent_token_gs, "gre-forceRestart", "1", 0);
                     }
                 }
-#endif
             }
 			else if (ret_value == WAN_STATUS) {
                                 rc = strcmp_s("started", strlen("started"),val, &ind);
@@ -2758,7 +2756,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                                     if (!once) {
 						check_lan_wan_ready();
 					}
-#if (defined(INTEL_PUMA7) || defined(_LG_MV2_PLUS_))
                     /*If the GW is IPv4 only mode or Dual-Stack mode, try to start the hotspot after the IPv4 WAN ready.
                     Explanation for the special cases on dual stack mode:
                     1) If both IPv4 and IPv6 adress can be got, start the hotspot here after IPv4 WAN ready
@@ -2785,7 +2782,6 @@ static void *GWP_sysevent_threadfunc(void *data)
                            sysevent_set(sysevent_fd_gs, sysevent_token_gs, "gre-forceRestart", "1", 0);
                         } 
                     }
-#endif
 
                     char rip_status[8];
                     char erouter_static_ip_enable[8];
@@ -4132,7 +4128,7 @@ static void LAN_start (void)
     return;
 }
 
-#if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
+#if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_) || defined(_LG_OFW_)
 static void _get_shell_output (FILE *fp, char *buf, int len)
 {
     if (fp == NULL)
