@@ -379,6 +379,32 @@ static int sIPv4_acquired = 0;
 static void GWP_EnterBridgeMode(void);
 static void GWP_EnterRouterMode(void);
 
+static void GWP_UpdateDeviceFirstUseDate(void)
+{
+    char firstUseDate[64];
+    FILE *fp;
+
+    syscfg_get(NULL, "device_first_use_date", firstUseDate, sizeof(firstUseDate));
+
+    if (firstUseDate[0] == 0) // First use date is not yet set
+    {
+        // Get the date and set as First use date in syscfg db
+        fp = popen("date +%Y-%m-%dT%H:%M:%S", "r");
+        if (fp != NULL)
+        {
+            if (fgets(firstUseDate, sizeof(firstUseDate), fp) != NULL)
+            {
+                if (syscfg_set(NULL, "device_first_use_date", firstUseDate) != 0)
+                {
+                    fprintf(stderr, "Error in %s: Failed to set device_first_use_date!\n", __FUNCTION__);
+                }
+            }
+
+            pclose(fp);
+        }
+    }
+}
+
 static bool isHotspotEnabled()
 {
     FILE *fp;
@@ -3052,6 +3078,10 @@ static int GWP_act_DocsisLinkUp_callback()
 #if defined (_PUMA6_ARM_)
     system("/etc/update_atom_time.sh");
 #endif
+
+    // Update the First use date in DeviceInfo
+    GWP_UpdateDeviceFirstUseDate();
+
     //if(bridge_mode != 0) //Not limit to bridge mode, since router mode might also start dhcp server (if last_erouter_mode=0)
     {
         char status[16] = {0};
