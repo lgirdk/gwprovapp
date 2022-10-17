@@ -306,6 +306,8 @@ static TlvParseCallbackStatusExtIf_e GW_setTopologyMode(Uint8 type, Uint16 lengt
 #endif
 
 /* New implementation !*/
+static int GWP_IssueCmdWithTimeout (char *cmd, char *respStr, int timeout);
+
 static void LAN_start();
 
 static void *GWP_UpdateTr069CfgThread( void *data );
@@ -1568,7 +1570,7 @@ static void GWP_EnableERouter(void)
     //system("sysevent set bridge_mode 0");
     //system("sysevent set forwarding-restart");
 	GWP_EnterRouterMode();
-    v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router");
+    GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router", "succeed", 30);
 
     printf("******************************\n");
     printf("* Enabled (after cfg file)  *\n");
@@ -1642,8 +1644,7 @@ static void GWP_DisableERouter(void)
     
     
     GWP_EnterBridgeMode();
-    v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static");
-
+    GWP_IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
     printf("******************************\n");
     printf("* Disabled (after cfg file)  *\n");
     printf("******************************\n");
