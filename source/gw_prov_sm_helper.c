@@ -42,6 +42,7 @@
 #include <syscfg/syscfg.h>
 #include <ansc_platform.h>
 
+#include "gw_prov_sm.h"
 #include "gw_prov_sm_helper.h"
 
 #include <cm_hal.h>
@@ -68,21 +69,6 @@ static void *bus_handle = NULL;
 #define ALIAS_MANAGER_MAPPER_FILE "/usr/ccsp/custom_mapper.xml"
 #define CR_COMPONENT_ID "eRT.com.cisco.spvtg.ccsp.CR"
 #define SUBSYSTEM_PREFIX "eRT."
-
-#if !defined(AUTOWAN_ENABLE)
-#ifdef FEATURE_SUPPORT_RDKLOG
-#define COMP_NAME "LOG.RDK.GWPROV"
-#define LOG_INFO 4
-#define DEBUG_INI_NAME  "/etc/debug.ini"
-#define GWPROV_PRINT(fmt ...)   {\
-                                    char _log_buff[1024]; \
-                                    snprintf(_log_buff, sizeof(_log_buff), fmt);\
-                                    RDK_LOG(LOG_INFO, COMP_NAME, "%s", _log_buff);\
-                                }
-#else
-#define GWPROV_PRINT printf
-#endif
-#endif
 
 #define WIFI_SSID               "Device.WiFi.SSID."
 #define WIFI_ACCESSPOINT        "Device.WiFi.AccessPoint."
