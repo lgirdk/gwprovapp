@@ -1561,6 +1561,8 @@ static void GWP_EnableERouter(void)
 	GWP_EnterRouterMode();
     IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router", "succeed", 30);
 
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
+
     printf("******************************\n");
     printf("* Enabled (after cfg file)  *\n");
     printf("******************************\n");
@@ -1596,7 +1598,6 @@ static void GWP_EnterRouterMode(void)
 
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
     
-    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 #if defined (_COSA_BCM_ARM_)
     sendPseudoBridgeModeMessage(FALSE);
 #endif
@@ -1633,6 +1634,8 @@ static void GWP_DisableERouter(void)
     GWP_EnterBridgeMode();
     IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
 
+    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
+
     printf("******************************\n");
     printf("* Disabled (after cfg file)  *\n");
     printf("******************************\n");
@@ -1659,7 +1662,6 @@ static void GWP_EnterBridgeMode(void)
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", BridgeMode, 0);
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
     
-    sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 #if defined (_COSA_BCM_ARM_)
     sendPseudoBridgeModeMessage(TRUE);
 #endif
