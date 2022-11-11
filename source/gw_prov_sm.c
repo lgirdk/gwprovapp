@@ -1314,20 +1314,11 @@ char MocaStatus[16] = {0};
 
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
 	GWPROV_PRINT(" MoCA_current_status = %s \n", MocaStatus);
-	if ((syscfg_set(NULL, "MoCA_previous_status", MocaStatus) != 0)) 
+	if ((syscfg_set_commit(NULL, "MoCA_previous_status", MocaStatus) != 0))
     {
         printf("syscfg_set failed\n");
-        
     }
-    else 
-    {
-        if (syscfg_commit() != 0) 
-        {
-		    printf("syscfg_commit failed\n");
-		    
-	    }	    
-	}	
-	
+
     v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", "3", 0);
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
