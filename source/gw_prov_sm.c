@@ -3245,7 +3245,7 @@ static int GWP_act_ProvEntry_callback (void)
 
     /* Register on docsis Init event */
 #if !defined(INTEL_PUMA7) 
-    GWPROV_PRINT(" registerDocsisInitEvents \n");
+    GWPROV_PRINT("Entry %s registerDocsisIntiEvents \n",__FUNCTION__);
     registerDocsisInitEvents();
 #endif
     GWPROV_PRINT(" Calling /etc/utopia/utopia_init.sh \n"); 
