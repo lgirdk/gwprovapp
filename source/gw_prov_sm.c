@@ -1558,9 +1558,8 @@ static void GWP_EnableERouter(void)
     //bridge_mode = 0;
     //v_secure_system("sysevent set bridge_mode 0");
     //v_secure_system("sysevent set forwarding-restart");
-	GWP_EnterRouterMode();
     IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router", "succeed", 30);
-
+    GWP_EnterRouterMode();
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 
     printf("******************************\n");
@@ -1630,10 +1629,8 @@ static void GWP_DisableERouter(void)
 //   v_secure_system("sysevent set bridge_mode %d", bridge_mode);
 //   v_secure_system("sysevent set forwarding-restart");
     
-    
-    GWP_EnterBridgeMode();
     IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
-
+    GWP_EnterBridgeMode();
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 
     printf("******************************\n");
