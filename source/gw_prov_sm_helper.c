@@ -463,7 +463,7 @@ int GWP_act_ErouterSnmpInitModeSet_callback(void)
             GWPROV_PRINT(("syscfg_set failed\n"));
         }
 
-        sleep(5);
+        sleep(10);
         system("reboot"); // Reboot on change of device mode.
     }
 
