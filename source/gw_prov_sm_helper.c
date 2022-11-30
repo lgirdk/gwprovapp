@@ -477,7 +477,11 @@ int GWP_act_ErouterSnmpInitModeSet_callback(void)
             GWPROV_PRINT(("syscfg_set failed\n"));
         }
 
+#ifdef _COSA_BCM_ARM_
+        sleep(10);
+#else
         sleep(5);
+#endif
         system("reboot"); // Reboot on change of device mode.
     }
 
