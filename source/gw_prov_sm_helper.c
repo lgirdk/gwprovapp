@@ -1600,6 +1600,7 @@ static void *GW_DmObjectThread(void *pParam)
         {
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_status", "End", 0);
             sysevent_set(sysevent_fd_gs, sysevent_token_gs, "cfgfile_apply", "", 0);
+            system("touch /tmp/cfg_file_applied");
             gbDmObjectParseCfgDone = false;
         }
     }
