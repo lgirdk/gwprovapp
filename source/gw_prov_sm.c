@@ -254,7 +254,8 @@ typedef struct
     eGwpThreadType mType;       
 } GwpThread_MsgItem;
 
-GwpThread_MsgItem gwpthreadMsgArr[] = {
+static const GwpThread_MsgItem gwpthreadMsgArr[] =
+{
     {"erouter_mode",                               EROUTER_MODE},
     {"ipv4-status",                                IPV4STATUS},
     {"ipv6-status",                                IPV6STATUS},
@@ -366,7 +367,7 @@ static int sIPv6_acquired = 0;
 static void GWP_EnterBridgeMode(void);
 static void GWP_EnterRouterMode(void);
 
-eGwpThreadType Get_GwpThreadType(char *name)
+static eGwpThreadType Get_GwpThreadType(char *name)
 {
     errno_t rc       = -1;
     int     ind      = -1;
@@ -1080,9 +1081,7 @@ static int GWP_IsGwEnabled(void)
 }
 #endif
 
-/* Coverity Fix CID:56406 MISSING_RETURN */
-void 
-validate_mode(int *bridge_mode, int *eRouterMode)
+static void validate_mode(int *bridge_mode, int *eRouterMode)
 {
 	if((*eRouterMode < DOCESAFE_ENABLE_DISABLE_extIf)  || (*eRouterMode > DOCESAFE_ENABLE_NUM_ENABLE_TYPES_extIf)
 		|| ((*bridge_mode != BRMODE_ROUTER) && (*bridge_mode != BRMODE_PRIMARY_BRIDGE) && (*bridge_mode != BRMODE_GLOBAL_BRIDGE)))
