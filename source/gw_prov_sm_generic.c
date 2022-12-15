@@ -265,7 +265,7 @@ static void check_lan_wan_ready();
 static void LAN_start();
 
 
-void GWP_Util_get_shell_output( char * cmd, char *out, int len );
+void GWP_Util_get_shell_output( char *cmd, char *out, int len );
 
 void setGWP_ipv4_event();
 
@@ -338,7 +338,7 @@ int IsEthWanEnabled()
     return 0;
 }
 
-eGwpThreadType Get_GwpThreadType(char * name)
+eGwpThreadType Get_GwpThreadType(char *name)
 {
     errno_t rc       = -1;
     int     ind      = -1;
@@ -386,7 +386,7 @@ static int GWPETHWAN_SysCfgSetInt(const char *name, int int_value)
    return syscfg_set_u(NULL, name, int_value);
 }
 
-void validate_mode(int* bridge_mode)
+void validate_mode(int *bridge_mode)
 {
     if((*bridge_mode != BRMODE_ROUTER) && (*bridge_mode != BRMODE_PRIMARY_BRIDGE) && (*bridge_mode != BRMODE_GLOBAL_BRIDGE))
     {
@@ -820,7 +820,7 @@ static void *GWP_sysevent_threadfunc(void *data)
         int ind1 = -1;
         char brlan0_inst[BRG_INST_SIZE] = {0};
         char brlan1_inst[BRG_INST_SIZE] = {0};
-        char* l3net_inst = NULL;
+        char *l3net_inst = NULL;
 #endif
 
 
@@ -1278,7 +1278,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 
 
 /* GWP_Util_get_shell_output() */
-void GWP_Util_get_shell_output( char * cmd, char *out, int len )
+void GWP_Util_get_shell_output( char *cmd, char *out, int len )
 {
     FILE  *fp = NULL;
     char   buf[ 16 ] = { 0 };
@@ -1488,7 +1488,7 @@ static void _get_shell_output (FILE *fp, char *buf, int len)
     }
 }
 
-pid_t findProcessId(char* processName)
+pid_t findProcessId(char *processName)
 {
 
     FILE *f = NULL;
