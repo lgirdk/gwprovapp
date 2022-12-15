@@ -47,7 +47,7 @@
 	
 /* -- Includes -- */	
 #include <stdio.h>
-#include "stdbool.h"
+#include <stdbool.h>
 
 #define GW_TR069_TLV_MAX_URL_LEN            256
 #define GW_TR069_TLV_MAX_USERNAME_LEN       256
@@ -63,27 +63,6 @@
 #define GW_SUBTLV_TR069_ACS_OVERRIDE_EXTIF                7
 
 #if defined(_PLATFORM_RASPBERRYPI_) || defined(_COSA_BCM_ARM_)
-typedef enum
-{
-    False = 0,
-    True = 1
-} Bool;
-
-typedef int                 Int;
-typedef unsigned int        Uns;
-typedef unsigned int        Uint;
-typedef unsigned long       Ulong;
-typedef char                Char;
-typedef char*               String;
-typedef void*               Ptr;
-typedef long long           Int64;
-typedef int                 Int32;
-typedef short               Int16;
-typedef signed char         Int8;
-typedef unsigned long long  Uint64;
-typedef unsigned int        Uint32;
-typedef unsigned short      Uint16;
-typedef unsigned char       Uint8;
 
 typedef enum Status
 {
@@ -97,7 +76,7 @@ typedef enum Status
 
 typedef struct mac_addr
 {
-    Uint8 hw[ MAC_ADDR_LEN ];
+    unsigned char hw[ MAC_ADDR_LEN ];
 } macaddr_t;
 #endif
 
@@ -188,13 +167,13 @@ typedef enum
  */
 typedef struct GwTlv2StructExtIf
 {
-    Int tlvIndex;
+    int tlvIndex;
     GwTr069PaEnableCwmpTypeExtIf_e EnableCWMP;
-    Char URL[GW_TR069_TLV_MAX_URL_LEN+1];
-    Char Username[GW_TR069_TLV_MAX_USERNAME_LEN+1];
-    Char Password[GW_TR069_TLV_MAX_PASSWORD_LEN+1];
-    Char ConnectionRequestUsername[GW_TR069_TLV_MAX_USERNAME_LEN+1];
-    Char ConnectionRequestPassword[GW_TR069_TLV_MAX_PASSWORD_LEN+1];
+    char URL[GW_TR069_TLV_MAX_URL_LEN+1];
+    char Username[GW_TR069_TLV_MAX_USERNAME_LEN+1];
+    char Password[GW_TR069_TLV_MAX_PASSWORD_LEN+1];
+    char ConnectionRequestUsername[GW_TR069_TLV_MAX_USERNAME_LEN+1];
+    char ConnectionRequestPassword[GW_TR069_TLV_MAX_PASSWORD_LEN+1];
     GwTr069PaAcsOverrideTypeExtIf_e ACSOverride;
 }GwTlv2StructExtIf_t;
 
@@ -218,18 +197,18 @@ typedef enum TlvParseCallbackStatusExtIf
 typedef int (*fpDocsisLinkDown_1)();
 typedef int (*fpDocsisLinkDown_2)();
 typedef int (*fpDocsisLinkUp)();
-typedef int (*fpDocsisCfgfile)(Char*);
+typedef int (*fpDocsisCfgfile)(char*);
 typedef int (*fpDocsisTftpOk)();
 typedef int (*fpBefCfgfileEntry)();
 typedef int (*fpDocsisInited)();
 typedef int (*fpProvEntry)();
-typedef void (*fpDocsisEnabled)(Uint8);
+typedef void (*fpDocsisEnabled)(unsigned char);
 #if defined(INTEL_PUMA7)
-typedef void (*fpDocsisRATransInterval)(Uint16);
+typedef void (*fpDocsisRATransInterval)(unsigned short);
 #endif
-typedef TlvParseCallbackStatusExtIf_e (*fpGW_Tr069PaSubTLVParse)(Uint8 type, Uint16 length, const Uint8* value);
+typedef TlvParseCallbackStatusExtIf_e (*fpGW_Tr069PaSubTLVParse)(unsigned char type, unsigned short length, const unsigned char *value);
 #ifdef CISCO_CONFIG_DHCPV6_PREFIX_DELEGATION
-typedef void (*fpGW_SetTopologyMode)(Uint8 type, Uint16 length, const Uint8* value);
+typedef void (*fpGW_SetTopologyMode)(unsigned char type, unsigned short length, const unsigned char *value);
 #endif
 
 /*! \var typedef struct __appCallBack 
@@ -305,7 +284,7 @@ void eSafeDevice_Initialize(macaddr_t* macAddr);
 *
 *
 * @param[in] char *devName - name of the network device.
-* @param[in] bool addDel - True -> Add, False -> Delete
+* @param[in] bool addDel - true -> Add, false -> Delete
 * @retval void.
 */
 void eSafeDevice_AddeRouterPhysicalNetworkInterface(char *devName, bool addDel);
@@ -411,34 +390,34 @@ void getNetworkDeviceMacAddress(macaddr_t* macAddr);
 *\n Prototype :
         void getMultiCastGroupAddress
 	(
-		Uint8 *inetAddr, Uint8 *inetMcgrpAddr
+		unsigned char *inetAddr, unsigned char *inetMcgrpAddr
 	)
 *\n Caller : static void *GWP_sysevent_threadfunc(void *data)
 *	   static int GWP_act_DocsisInited_callback()
 *
 *
-* @param[in] Uint8 *inetAddr
-* @param[out] Uint8 *inetMcgrpAddr
+* @param[in] unsigned char *inetAddr
+* @param[out] unsigned char *inetMcgrpAddr
 * @retval void.
 */
-void getMultiCastGroupAddress(Uint8 *inetAddr, Uint8 *inetMcgrpAddr);
+void getMultiCastGroupAddress(unsigned char *inetAddr, unsigned char *inetMcgrpAddr);
 
 /** 
 * @brief  Set MAC address for the network device.
 *\n Prototype :
         void setNetworkDeviceMacAddress
 	(
-		const Char *devName,macaddr_t* macAddr
+		const char *devName,macaddr_t* macAddr
 	)
 *\n Caller : static int GWP_act_DocsisInited_callback()
 *
 *
-* @param[in] const Char *devName - Name of the Device.
+* @param[in] const char *devName - Name of the Device.
 * @param[in] macaddr_t* macAddr - Macaddress of the.
 * @param[out] None.
 * @retval void.
 */
-void setNetworkDeviceMacAddress(const Char *devName,macaddr_t* macAddr);
+void setNetworkDeviceMacAddress(const char *devName,macaddr_t* macAddr);
 
 /** 
 * @brief  Calculate interface's base solicited node address
@@ -446,16 +425,16 @@ void setNetworkDeviceMacAddress(const Char *devName,macaddr_t* macAddr);
 *\n Prototype :
         void getInterfaceLinkLocalAddress
 	(
-		const Char* ifname, Uint8 *linkLocalAddr
+		const char *ifname, unsigned char *linkLocalAddr
 	)
 *\n Caller : static int GWP_act_DocsisInited_callback()
 *
 *
-* @param[in] const Char* ifname - Network interface name
-* @param[out] Uint8 *linkLocalAddr - result link local address
+* @param[in] const char *ifname - Network interface name
+* @param[out] unsigned char *linkLocalAddr - result link local address
 * @retval void.
 */
-void getInterfaceLinkLocalAddress(const Char* ifname, Uint8 *linkLocalAddr);
+void getInterfaceLinkLocalAddress(const char *ifname, unsigned char *linkLocalAddr);
 
 /** 
 * @brief  Connect/Disconnect DOCSIS local bridge
@@ -468,7 +447,7 @@ void getInterfaceLinkLocalAddress(const Char* ifname, Uint8 *linkLocalAddr);
 *\n Caller : static int GWP_act_DocsisInited_callback()
 *
 *
-* @param[in] bool bValue - True -> Connect, False -> Disconnect
+* @param[in] bool bValue - true -> Connect, false -> Disconnect
 * @param[out]
 * @retval void.
 */
@@ -566,7 +545,7 @@ void SME_CreateEventHandler(appCallBack *pAppCallBack);
 * @brief  Send a notification to GIM on esafe configuration file.
 *\n Prototype :
         void  notificationReply_CfgFileForEsafe()
-*\n Caller : static int GWP_act_DocsisCfgfile_callback(Char* cfgFile).
+*\n Caller : static int GWP_act_DocsisCfgfile_callback(char *cfgFile).
 *
 *
 * @param[in] None.
@@ -580,16 +559,16 @@ void  notificationReply_CfgFileForEsafe();
 *\n Prototype :
         void getDocsisDbFactoryMode
 	(
-		Uint32* factoryMode
+		unsigned int *factoryMode
 	)
 *\n Caller : static int GWP_act_DocsisInited_callback()
 *
 *
 * @param[in] None.
-* @param[out] Uint32* factoryMode.
+* @param[out] unsigned int *factoryMode.
 * @retval void.
 */
-void getDocsisDbFactoryMode(Uint32* factoryMode);
+void getDocsisDbFactoryMode(unsigned int *factoryMode);
 
 /** 
 * @brief  Get WAN interface MAC address.
@@ -639,7 +618,7 @@ void sendProcessReadySignal();
 *\n Prototype :
         pid_t findProcessId
 	(
-		Char* processName
+		char *processName
 	)
 *\n Caller : int main(int argc, char *argv[]).
 *
@@ -649,24 +628,24 @@ void sendProcessReadySignal();
 * @param[out] None.
 * @retval pid_t : Process Id.
 */
-pid_t findProcessId(Char* processName);
+pid_t findProcessId(char *processName);
 
 /** 
 * @brief Register exception handlers for the process as part of PCD.
 *\n Prototype :
        	void registerProcessExceptionHandlers
 	(
-		Char *name
+		char *name
 	)
 *\n Caller : int main(int argc, char *argv[]).
 *
 *
-* @param[in] char* argv[0] - Process name which has to register 
+* @param[in] char *argv[0] - Process name which has to register 
 *			     handler for exceptions.
 * @param[out] None.
 * @retval void.
 */
-void registerProcessExceptionHandlers(Char *name);
+void registerProcessExceptionHandlers(char *name);
 
 /** 
 * @brief Function is called to parse the TLV parameters 
@@ -674,18 +653,18 @@ void registerProcessExceptionHandlers(Char *name);
 *\n Prototype :
         int parseTlv
 	(
-		Uint8 *confFileBuff, 
-		Uint32 confFileBuffLen
+		unsigned char *confFileBuff, 
+		unsigned int confFileBuffLen
 	)
-*\n Caller : GWP_act_DocsisCfgfile_callback(Char* cfgFile).
+*\n Caller : GWP_act_DocsisCfgfile_callback(char *cfgFile).
 *
 *
-* @param[in] Uint8 *confFileBuff : Pointer to the config file.
-* @param[in] Uint32 confFileBuffLen : Config file buffer length.
+* @param[in] unsigned char *confFileBuff : Pointer to the config file.
+* @param[in] unsigned int confFileBuffLen : Config file buffer length.
 * @param[out] None.
 * @retval int
 */
-int parseTlv(Uint8 *confFileBuff, Uint32 confFileBuffLen);
+int parseTlv(unsigned char *confFileBuff, unsigned int confFileBuffLen);
 
 
 /** 
