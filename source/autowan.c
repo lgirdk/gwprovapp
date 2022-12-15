@@ -113,7 +113,7 @@ CosaDmlEthWanSetEnable
         BOOL                       bEnable
     );
 
-char* WanModeStr(int WanMode)
+char *WanModeStr(int WanMode)
 {
     if(WanMode == WAN_MODE_AUTO)
     {
