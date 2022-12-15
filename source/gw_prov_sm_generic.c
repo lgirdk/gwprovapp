@@ -250,7 +250,8 @@ typedef struct
     eGwpThreadType mType;       
 } GwpThread_MsgItem;
 
-GwpThread_MsgItem gwpthreadMsgArr[] = {
+static const GwpThread_MsgItem gwpthreadMsgArr[] =
+{
     {"erouterModeInternal",                        EROUTER_MODE_INTERNAL},
     {"erouter_mode",                               EROUTER_MODE},
     {"ipv4-status",                                IPV4STATUS},
@@ -336,7 +337,7 @@ static void GWPEthWan_EnterRouterMode(void);
 /**************************************************************************/
 /*      LOCAL FUNCTIONS:                                                  */
 /**************************************************************************/
-int IsEthWanEnabled()
+static int IsEthWanEnabled(void)
 {
     char buf[32];
 
@@ -354,7 +355,7 @@ int IsEthWanEnabled()
     return 0;
 }
 
-eGwpThreadType Get_GwpThreadType(char *name)
+static eGwpThreadType Get_GwpThreadType(char *name)
 {
     errno_t rc       = -1;
     int     ind      = -1;
@@ -402,7 +403,7 @@ static int GWPETHWAN_SysCfgSetInt(const char *name, int int_value)
    return syscfg_set_u(NULL, name, int_value);
 }
 
-void validate_mode(int *bridge_mode)
+static void validate_mode(int *bridge_mode)
 {
     if((*bridge_mode != BRMODE_ROUTER) && (*bridge_mode != BRMODE_PRIMARY_BRIDGE) && (*bridge_mode != BRMODE_GLOBAL_BRIDGE))
     {
@@ -418,8 +419,8 @@ void validate_mode(int *bridge_mode)
     GWPROV_PRINT(" %s : bridge_mode = %d\n", __FUNCTION__, *bridge_mode);
  }
 
-static int getSyseventBridgeMode(int erouterMode, int bridgeMode) {
-        
+static int getSyseventBridgeMode(int erouterMode, int bridgeMode)
+{
     //Erouter mode takes precedence over bridge mode. If erouter is disabled, 
     //global bridge mode is returned. Otherwise partial bridge or router  mode
     //is returned based on bridge mode. Partial bridge keeps the wan active
