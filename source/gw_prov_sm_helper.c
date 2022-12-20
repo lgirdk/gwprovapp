@@ -1621,7 +1621,7 @@ static void *GW_DmObjectThread(void *pParam)
 	/* Since majority of the datamodel parameters are in PandM module,
 	 * Added wait for PandM to be initialized before trying to set the parameters.
 	 */
-        else if (!GW_DmObjectListIsEmpty() && access("/tmp/pam_initialized", F_OK) == 0)
+        if (!GW_DmObjectListIsEmpty() && access("/tmp/pam_initialized", F_OK) == 0)
         {
             GW_DmObjectListApply();
         }
