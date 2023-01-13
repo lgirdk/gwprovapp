@@ -61,6 +61,7 @@ int g_AutoWanRetryInterval  = 0;
 #if defined (_BRIDGE_UTILS_BIN_)
 #define ONEWIFI_ENABLED "/etc/onewifi_enabled"
 #define OPENVSWITCH_LOADED "/sys/module/openvswitch"
+#define WFO_ENABLED        "/etc/WFO_enabled"
     int g_OvsEnable             = 0;
 #endif
 void IntializeAutoWanConfig();
@@ -159,9 +160,10 @@ void AutoWAN_main()
           AUTO_WAN_LOG("syscfg_get failed to retrieve ovs_enable\n");
 
     }
-    if( (0 == access( ONEWIFI_ENABLED, F_OK )) || (0 == access( OPENVSWITCH_LOADED, F_OK )) )
+    if( (0 == access( ONEWIFI_ENABLED, F_OK )) || (0 == access( OPENVSWITCH_LOADED, F_OK ))
+                                               || (access(WFO_ENABLED, F_OK) == 0 ) )
     {
-        AUTO_WAN_LOG("g_OvsEnable is set to 1 for OneWifi build\n");
+        AUTO_WAN_LOG("g_OvsEnable is set to 1 for OneWifi/WFO build\n");
         g_OvsEnable = 1;
     }
 #endif 
