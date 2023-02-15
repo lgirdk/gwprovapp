@@ -1771,8 +1771,6 @@ void GWP_UpdateERouterMode(void)
             /* poll object from WiFi data model (when read succeeds, WiFi agent is running and able to set bridge mode) */
             IssueCmdWithTimeout("dmcli eRT getv Device.WiFi.X_CISCO_COM_FactoryReset", "value", 60);
 
-            IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string bridge-static", "succeed", 30);
-
             GWP_DisableERouter();
 #if defined (_XB6_PRODUCT_REQ_) && defined (_COSA_BCM_ARM_)
             if(eRouterMode == DOCESAFE_ENABLE_NUM_ENABLE_TYPES_extIf) // If the mode is set to this value then changing it
@@ -1811,8 +1809,6 @@ void GWP_UpdateERouterMode(void)
                 webui_started = 0;
                 active_mode = BRMODE_ROUTER; //This is set so that the callback from LanMode does not trigger another transition.
                                                     //The code here will here will handle it.
-
-                IssueCmdWithTimeout("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.LanManagementEntry.1.LanMode string router", "succeed", 30);
 
                 GWP_EnableERouter();
             }
@@ -3587,8 +3583,6 @@ gimReply:
     /* Reply to GIM SRN */
     notificationReply_CfgFileForEsafe();
     
-    GWP_UpdateERouterMode();
-
     return 0;
 }
 
