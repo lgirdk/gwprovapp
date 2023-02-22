@@ -73,6 +73,28 @@ static void *bus_handle = NULL;
 #define NUMBER_OF_DATA_MODELS   6
 #define MAX_DATAMODEL_SIZE      256
 
+typedef struct ccsp_pair {
+  char              *name;
+  enum dataType_e   type;
+} CCSP_PAIR;
+
+static CCSP_PAIR ccsp_type_table[] = {
+  { "string",   ccsp_string },
+  { "int",      ccsp_int },
+  { "uint",     ccsp_unsignedInt },
+  { "bool",     ccsp_boolean },
+  { "dateTime", ccsp_dateTime },
+  { "base64",   ccsp_base64 },
+  { "long",     ccsp_long },
+  { "ulong",    ccsp_unsignedLong },
+  { "float",    ccsp_float },
+  { "double",   ccsp_double },
+  { "byte",     ccsp_byte },
+  { "hexBinary",ccsp_hexBinary}
+};
+
+#define NUM_CCSP_TYPES (sizeof(ccsp_type_table)/sizeof(ccsp_type_table[0]))
+
 // globals for TLV202.43.12 processing
 static DmObject_t *gpDmObjectHead = NULL;
 static DmObject_t *gpDmObjectHeadAlias = NULL;    /* Sorted list for parameter with object instance number/alias */
@@ -80,12 +102,133 @@ static bool gbDmObjectParseCfgDone = false;
 static int DmObjectSockFds[2];
 
 static void Send_Release(char *file_name);
-static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded);
+//static bool GW_HandleAliasDm((void* bus_handle, DmObject_t dmObject, int objectListAddNeeded);
 static bool init_message_bus(void);
 static bool isAliasMatch(char *object_name, char *parent, char *alias);
 static bool isParentMatch(char *object_name, char *parent);
-static void GW_HandleAliasDmList(void);
+static void GW_HandleAliasDmList(void* bus_handle);
 static int getIndex(char *lineOutput, char *parent);
+
+/**************************************************************************/
+/*! \fn bool ccsp_type_from_name(har *name, enum dataType_e *type_ptr)
+ **************************************************************************
+ *  \brief Get CCSP equivalent for paramter type
+ *  \return bool 
+ **************************************************************************/
+static bool ccsp_type_from_name(char *name, enum dataType_e *type_ptr)
+{
+  int i;
+  if(name == NULL)
+     return false;
+  for (i = 0 ; i < NUM_CCSP_TYPES ; ++i)
+  {
+      if ( 0 == strcmp(name, ccsp_type_table[i].name) )
+      {
+          *type_ptr = ccsp_type_table[i].type;
+          return true;
+      }
+  }
+  return false;
+}
+
+/**************************************************************************/
+/*! \fn int GW_SetParameterValue(const char *pName, const char *pType, const char *pValue);
+ **************************************************************************
+ *  \brief Set DM paramter value
+ *  \param[in] bus_handle - CCSP bus handle
+ *  \param[in] pName - Parameter Name
+ *  \param[in] pType - Parameter Type 
+ *  \param[in] pValue - Parameter Value
+ *  \return int - 0-success 
+ *                1-set param value error 
+ *                2-Issues with component discovery, input params
+ **************************************************************************/
+
+static int GW_SetParameterValue(void* bus_handle, const char *pName, const char *pType, const char *pValue)
+{
+    componentStruct_t ** ppComponents = NULL;
+    int size = 0;
+    char *dst_componentid =  NULL;
+    char *dst_pathname    =  NULL;
+    parameterValStruct_t param_val[1] = {0};
+    char* pFaultParameter = NULL;
+    int FailureCount = 0;
+    int ret;
+
+    if ((bus_handle == NULL) || (pName == NULL) || (pType == NULL) || (pValue == NULL))
+    {
+        GWPROV_PRINT("Error input parameter\n");
+        return 2;
+    }
+    while (1)
+    {
+        ret = CcspBaseIf_discComponentSupportingNamespace
+        (
+            bus_handle, 
+            CR_COMPONENT_ID, 
+            pName,
+            SUBSYSTEM_PREFIX, 
+            &ppComponents, 
+            &size
+        );  
+        if ( ret == CCSP_SUCCESS )
+        {
+            if ( size != 0 ) 
+                break;
+                
+            GWPROV_PRINT("Can't find destination component for %s\n", pName);
+        }
+        else
+        {
+            if((ret == CCSP_MESSAGE_BUS_NOT_EXIST)||(ret == CCSP_CR_ERR_UNSUPPORTED_NAMESPACE))
+            {
+                GWPROV_PRINT("Can't find destination component for %s FailureCount:%d\n", pName,FailureCount);
+            }
+            else 
+            {
+                GWPROV_PRINT("Ccsp msg bus internal error for %s, ret=%d\n", pName, ret);
+            }
+        }
+        FailureCount++;
+        if (FailureCount > MAX_DM_OBJ_RETRIES)
+        {
+            GWPROV_PRINT(" Failed to apply param : %s Tried %d no of times.\n", pName, MAX_DM_OBJ_RETRIES);
+            return 2;
+        }
+        usleep(400*1000);   // 400 msecs
+    }
+    dst_componentid = ppComponents[0]->componentName;
+    dst_pathname    = ppComponents[0]->dbusPath;
+    param_val[0].parameterName = (char *)pName;
+    param_val[0].parameterValue = (char *)pValue;
+    if (!ccsp_type_from_name((char *)pType, &param_val[0].type))
+    {
+        GWPROV_PRINT("unrecognized type name: %s\n", pName);
+        return 1;
+    }
+    ret = CcspBaseIf_setParameterValues(
+          bus_handle,
+          dst_componentid,
+          dst_pathname,
+          0,
+          0,
+          param_val,
+          1,
+          TRUE,
+          &pFaultParameter);
+
+    if(ret != CCSP_SUCCESS)
+    {
+        GWPROV_PRINT("Failed to set %s\n", param_val[0].parameterName);
+        if (pFaultParameter)
+        {
+            CCSP_MESSAGE_BUS_INFO *bus_info = (CCSP_MESSAGE_BUS_INFO *)bus_handle;
+            bus_info->freefunc(pFaultParameter);
+        }
+        return 1;
+    }
+    return 0;
+} 
 
 static int SaveRestartMask(unsigned long mask)
 {
@@ -630,29 +773,6 @@ static int GW_MapTr69IndexToDmcliIndex(const char *tr69Name, char *dmcliName)
 }
 
 /**************************************************************************/
-/*! \fn bool GW_CheckForErrorStr(FILE *pFile, char *errorStr);
- **************************************************************************
- *  \brief Check for specified error in a result file
- *  \param[in] pFile - File to read result data from
- *  \param[in] errorStr - Error string to look for
- *  \return true - errorStr was found, false - errorStr was not found
- **************************************************************************/
-static bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
-{
-    char buf[256];
-
-    while (fgets(buf, sizeof(buf), pFile) != NULL)
-    {
-        if (strstr(buf, errorStr) != NULL)
-        {
-            // error found
-            return true;
-        }
-    }
-    return false;
-}
-
-/**************************************************************************/
 /*! \fn bool GW_SetParam(char *pName, char *pType, char *pValue);
  **************************************************************************
  *  \brief Set DataModel parameter
@@ -661,15 +781,14 @@ static bool GW_CheckForErrorStr(FILE *pFile, char *errorStr)
  *  \param[in] pValue - Parameter Value
  *  \return true - Parameter was found and set, false - Parameter not found
  **************************************************************************/
-static bool GW_SetParam(const char *pName, const char *pType, const char *pValue)
+static bool GW_SetParam(void* bus_handle, const char *pName, const char *pType, const char *pValue)
 {
     char cmd[1024];
     bool success = false;
-    FILE *result = NULL;
     char retName[MAX_DATAMODEL_SIZE] = "";
     int ret = 0;
 
-    if (pName == NULL || pType == NULL || pValue == NULL)
+    if (!bus_handle || pName == NULL || pType == NULL || pValue == NULL)
     {
         return false;
     }
@@ -687,20 +806,12 @@ static bool GW_SetParam(const char *pName, const char *pType, const char *pValue
             return true;
     }
 
-    /* Call dmcli to apply the parameter. This really needs to be reworked to use d-bus
-       transactions directly. That is something for future enhancement. */
     if(strlen(retName) != 0)
-        snprintf(cmd, sizeof(cmd), "dmcli eRT true setvalues '%s' %s '%s'", retName, pType, pValue);
+        ret = GW_SetParameterValue (bus_handle, retName, pType, pValue);
     else
-        snprintf(cmd, sizeof(cmd), "dmcli eRT true setvalues '%s' %s '%s'", pName, pType, pValue);
+        ret = GW_SetParameterValue (bus_handle, pName, pType, pValue);
+    if (ret <= 1) success=true; 
 
-    /* Retry on "Can't find dest component" error to workaround startup timing sensitivity */
-    result = popen(cmd, "r");
-    if (result)
-    {
-        success = !GW_CheckForErrorStr(result, "Can't find destination component");
-        pclose(result);
-    }
     /* keep a flag if we ever set a WiFi param so we can apply settings later */
     if (success)
     {
@@ -849,14 +960,19 @@ static void GW_DmObjectListApply(void)
     DmObject_t *pPrev = NULL;
     DmObject_t *pCurr = gpDmObjectHead;
 
-    /* Call GW_HandleAliasDmList(), to process gpDmObjectHeadAlias list */
-    GW_HandleAliasDmList();
+    if (!init_message_bus())
+    {
+        return;
+    }
 
+    /* Call GW_HandleAliasDmList(), to process gpDmObjectHeadAlias list */
+    GW_HandleAliasDmList(bus_handle);
+#if 0
     while (pCurr != NULL)
     {
         /* GW_SetParam() only returns failure if the parameter could not be found... it can still fail
         for invalid value, etc., but in those cases we don't want to retry because there is no point */
-        success = GW_SetParam(pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+        success = GW_SetParam(bus_handle, pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
 
         if (!success)
         {
@@ -889,6 +1005,27 @@ static void GW_DmObjectListApply(void)
             pCurr = pCurr->pNext;
         }
     }
+#else
+    while (pCurr != NULL)
+    {
+        GW_SetParam(bus_handle, pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+
+        if (pCurr == gpDmObjectHead)
+        {
+            gpDmObjectHead = pCurr->pNext;
+        }
+        else
+        {
+            pPrev->pNext = pCurr->pNext;
+        }
+
+        /* free the node */
+        DmObject_t *pOld = pCurr;
+        pCurr = pCurr->pNext;
+        free(pOld);
+    }
+#endif
+
 }
 
 /**************************************************************************/
@@ -988,7 +1125,7 @@ static bool check_alias(char * cmd_output, char * alias)
     return success;
 }
 
-static void GW_HandleAliasDmList()
+static void GW_HandleAliasDmList(void* bus_handle)
 {
     componentStruct_t **ppComponents = NULL;
     DmObject_t *pLastNode = NULL;
@@ -1003,11 +1140,10 @@ static void GW_HandleAliasDmList()
     int idx = -1;
     bool success = false;
 
-    if (!init_message_bus())
+    if (!bus_handle)
     {
         return;
     }
-
     while (pCurr != NULL)    /* Outer Loop: runs once for each parent Object */
     {
         char *object_name = strdup(pCurr->Name);
@@ -1141,7 +1277,7 @@ static void GW_HandleAliasDmList()
                                         AnscFreeMemory(internalName);
                                 }
 
-                                GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+                                GW_SetParam(bus_handle, cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
                             }
 
                             free(pCurr);
@@ -1200,7 +1336,7 @@ static void GW_HandleAliasDmList()
                 {
                     GWPROV_PRINT("Added idx %d for %s[%s]\n", idx, objParent, alias);
                     snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, idx);
-                    GW_SetParam(cmd, "string", alias);
+                    GW_SetParam(bus_handle, cmd, "string", alias);
                     lastAlias = strdup(alias);
                 }
                 else
@@ -1223,7 +1359,7 @@ static void GW_HandleAliasDmList()
                         AnscFreeMemory(internalName);
                 }
 
-                GW_SetParam(cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+                GW_SetParam(bus_handle, cmd, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
             }
 
             free(pCurr);
@@ -1261,8 +1397,10 @@ static void GW_HandleAliasDmList()
     }
 }
 
+#if 0
+
 /**************************************************************************/
-/*! \fn bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
+/*! \fn bool GW_HandleAliasDm(void* bus_handle, DmObject_t dmObject, int objectListAddNeeded)
  **************************************************************************
  *  \brief Handle [Alias] format TLV202.43.12 objects
  *  \param[in] dmObject - Parameter which has the info about TLV202.43.12 object
@@ -1270,7 +1408,7 @@ static void GW_HandleAliasDmList()
  *             added in list in case of failure
  *  \return bool - true if dmObject successfully applied.
  **************************************************************************/
-static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
+static bool GW_HandleAliasDm(void* bus_handle, DmObject_t dmObject, int objectListAddNeeded)
 {
     char *parent, *alias, *parameterName;
     char *cmd_output = NULL;
@@ -1283,6 +1421,10 @@ static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
     char *comp_not_found_err = "Can't find destination component";
     char *execution_fail_err = "Execution fail";
 
+    if (!bus_handle)
+    {
+        return false;
+    }
     object_name = strdup(dmObject.Name);
     if(object_name == NULL)
     {
@@ -1350,7 +1492,7 @@ static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
             {
                 flag = 1;
                 snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, i, parameterName);
-                if(GW_SetParam(cmd,dmObject.Type,dmObject.Value))
+                if(GW_SetParam(bus_handle, cmd,dmObject.Type,dmObject.Value))
                 {
                     /* return true only if the final object set is successful */
                     return_value = true;
@@ -1372,10 +1514,10 @@ static bool GW_HandleAliasDm(DmObject_t dmObject, int objectListAddNeeded)
             cmd_output = NULL;
 
             snprintf(cmd, sizeof(cmd), "%s%d.Alias", parent, inst);
-            if(GW_SetParam(cmd,"string", alias))
+            if(GW_SetParam(bus_handle, cmd,"string", alias))
             {
                 snprintf(cmd, sizeof(cmd), "%s%d.%s", parent, inst, parameterName);
-                if(GW_SetParam(cmd,dmObject.Type,dmObject.Value ))
+                if(GW_SetParam(bus_handle, cmd,dmObject.Type,dmObject.Value ))
                 {
                     /* return true only if the final object set is successful */
                     return_value = true;
@@ -1393,7 +1535,7 @@ out:
 
     return return_value;
 }
-
+#endif
 /**************************************************************************/
 /*! \fn bool GW_DmObjectThread(void *pParam);
  **************************************************************************
