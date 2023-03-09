@@ -153,6 +153,7 @@ static int GW_SetParameterValue(void* bus_handle, const char *pName, const char 
     parameterValStruct_t param_val[1] = {0};
     char* pFaultParameter = NULL;
     int FailureCount = 0;
+    int retVal=1;
     int ret;
 
     if ((bus_handle == NULL) || (pName == NULL) || (pType == NULL) || (pValue == NULL))
@@ -204,7 +205,7 @@ static int GW_SetParameterValue(void* bus_handle, const char *pName, const char 
     if (!ccsp_type_from_name((char *)pType, &param_val[0].type))
     {
         GWPROV_PRINT("unrecognized type name: %s\n", pName);
-        return 1;
+        goto freeMem;
     }
     ret = CcspBaseIf_setParameterValues(
           bus_handle,
@@ -225,9 +226,34 @@ static int GW_SetParameterValue(void* bus_handle, const char *pName, const char 
             CCSP_MESSAGE_BUS_INFO *bus_info = (CCSP_MESSAGE_BUS_INFO *)bus_handle;
             bus_info->freefunc(pFaultParameter);
         }
-        return 1;
     }
-    return 0;
+    else
+    {
+        retVal = 0;
+    }
+freeMem:
+    while( size && ppComponents)
+    {
+        if (ppComponents[size-1]->remoteCR_dbus_path)
+          AnscFreeMemory(ppComponents[size-1]->remoteCR_dbus_path);
+
+        if (ppComponents[size-1]->remoteCR_name)
+          AnscFreeMemory(ppComponents[size-1]->remoteCR_name);
+
+        if ( ppComponents[size-1]->componentName )
+          AnscFreeMemory( ppComponents[size-1]->componentName );
+
+        if ( ppComponents[size-1]->dbusPath )
+          AnscFreeMemory( ppComponents[size-1]->dbusPath );
+
+        AnscFreeMemory(ppComponents[size-1]);
+        size--;
+    }
+    if (ppComponents)
+    {
+        AnscFreeMemory(ppComponents);
+    }
+    return retVal;
 } 
 
 static int SaveRestartMask(unsigned long mask)
@@ -1392,6 +1418,10 @@ static void GW_HandleAliasDmList(void* bus_handle)
             AnscFreeMemory(ppComponents[size2-1]);
 
             size2--;
+        }
+        if (ppComponents)
+        {
+            AnscFreeMemory(ppComponents);
         }
         free(object_name);
     }
