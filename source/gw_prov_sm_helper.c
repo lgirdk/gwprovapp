@@ -195,7 +195,7 @@ static int GW_SetParameterValue(void* bus_handle, const char *pName, const char 
         {
             if((ret == CCSP_MESSAGE_BUS_NOT_EXIST)||(ret == CCSP_CR_ERR_UNSUPPORTED_NAMESPACE))
             {
-                GWPROV_PRINT("Can't find destination component for %s\n", pName);
+                GWPROV_PRINT("Can't find destination component for %s FailureCount:%d\n", pName,FailureCount);
             }
             else 
             {
@@ -208,7 +208,7 @@ static int GW_SetParameterValue(void* bus_handle, const char *pName, const char 
             GWPROV_PRINT(" Failed to apply param : %s Tried %d no of times.\n", pName, MAX_DM_OBJ_RETRIES);
             return 2;
         }
-        usleep(100*1000);   // 100 msecs
+        usleep(400*1000);   // 400 msecs
     }
     dst_componentid = ppComponents[0]->componentName;
     dst_pathname    = ppComponents[0]->dbusPath;
