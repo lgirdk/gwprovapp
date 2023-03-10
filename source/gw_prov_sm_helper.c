@@ -1179,7 +1179,7 @@ static void GW_HandleAliasDmList(void* bus_handle)
         char *cObj, *parent, *alias, *parameterName;
 
         int ret = CcspBaseIf_discComponentSupportingNamespace(bus_handle, CR_COMPONENT_ID, objParent, SUBSYSTEM_PREFIX, &ppComponents, &size2);
-        if (((ret == CCSP_SUCCESS) && (size2 == 0)) || (ret == CCSP_MESSAGE_BUS_NOT_EXIST)||(ret == CCSP_CR_ERR_UNSUPPORTED_NAMESPACE))
+        if (ret != CCSP_SUCCESS || size2 == 0)
         {
             GWPROV_PRINT("can't find destination component for %s\n", objParent);
             pCrawl = pCurr;
