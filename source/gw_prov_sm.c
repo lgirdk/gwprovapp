@@ -96,6 +96,10 @@
 #include <telemetry_busmessage_sender.h>
 #include "safec_lib_common.h"
 
+#if defined(ENABLE_LLD_SUPPORT) 
+#include "cm_hal.h"
+#endif
+
 #if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
 #include "platform_hal.h"
 #endif
@@ -191,6 +195,10 @@ void GWPROV_PRINT(const char *format, ...)
 
 #if defined(_XB6_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_)
 static void _get_shell_output (FILE *fp, char *buf, int len);
+#endif
+
+#if defined(ENABLE_LLD_SUPPORT)
+#define LLD_ACTIVE_STATUS_SYSEVENT "LLDActiveStatus"
 #endif
 
 static Tr69TlvData *tlvObject=NULL;
@@ -310,6 +318,10 @@ void GWP_Util_get_shell_output( char * cmd, char *out, int len );
 int COMMONUTILS_file_write(const char *string, char* cmdline, int len);
 
 STATUS GWP_InitDB(void);
+
+#if defined(ENABLE_LLD_SUPPORT)
+void low_latency_docsis_status_check(void);
+#endif
 
 /**************************************************************************/
 /*      LOCAL VARIABLES:                                                  */
@@ -2522,6 +2534,10 @@ static int GWP_act_DocsisLinkUp_callback()
         }
     }
 #endif
+    #if defined(ENABLE_LLD_SUPPORT)
+    sleep(10); // waiting for docsis to be completely up
+    low_latency_docsis_status_check();
+    #endif
 #endif
     return 0;
 }
@@ -3539,6 +3555,44 @@ static void _get_shell_output (FILE *fp, char *buf, int len)
     }
 }
 #endif
+
+#if defined(ENABLE_LLD_SUPPORT)
+void low_latency_docsis_status_check(void)
+{
+    int lld_active_status;
+    static int prev_lld_active_status = RETURN_ERR;
+    char sysevent_lld_status_buf[32] = "\0";
+    lld_active_status = docsis_LLDgetEnableStatus();
+    GWPROV_PRINT("%s : docsis_LLDgetEnableStatus returned %d, prev_lld_active_status is %d\n",__FUNCTION__,lld_active_status,prev_lld_active_status);
+    if(lld_active_status != prev_lld_active_status)
+    {
+        sysevent_get(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, sysevent_lld_status_buf, sizeof(sysevent_lld_status_buf));
+        GWPROV_PRINT("LLDActiveStatus sysevent is:%s\n",sysevent_lld_status_buf);
+
+        if(lld_active_status == ENABLE) 
+        {
+            GWPROV_PRINT("LLD is enabled. Setting LLD active status as true.\n");
+            sysevent_set(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, "true", 0);
+            GWPROV_PRINT("%s Triggering firewall-restart\n",__FUNCTION__);
+            sysevent_set(sysevent_fd, sysevent_token, "firewall-restart", "", 0);
+        }
+        else
+        {
+            GWPROV_PRINT("LLD is disabled. Setting LLD active status as false.\n");
+            sysevent_set(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, "false", 0);
+
+            if ( prev_lld_active_status == ENABLE )
+            {
+                GWPROV_PRINT("%s Triggering firewall-restart\n",__FUNCTION__);
+                sysevent_set(sysevent_fd, sysevent_token, "firewall-restart", "", 0);
+            }
+        }
+        prev_lld_active_status = lld_active_status;
+    }
+    GWPROV_PRINT("Exit %s \n",__FUNCTION__);
+}
+#endif
+
 
 /**************************************************************************/
 /*! \fn int main(int argc, char *argv)
