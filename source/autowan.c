@@ -585,7 +585,6 @@ int TryAltWan(int *mode)
 
 #if defined(INTEL_PUMA7)
     char udhcpcEnable[20] = {0};
-    char dibblerClientEnable[20] = {0};
 #endif
 
     syscfg_get(NULL, "wan_physical_ifname", out_value, sizeof(out_value));
@@ -616,13 +615,7 @@ int TryAltWan(int *mode)
        snprintf(udhcpcEnable, sizeof(udhcpcEnable), "%s", out_value);
     }
 
-    memset(out_value, 0, sizeof(out_value));
-    if (!syscfg_get(NULL, "dibbler_client_enable_v2", out_value, sizeof(out_value)))
-    {
-       snprintf(dibblerClientEnable, sizeof(dibblerClientEnable), "%s", out_value);
-    }
-
-    AUTO_WAN_LOG("%s - udhcpcEnable= %s dibblerClientEnable= %s\n",__FUNCTION__,udhcpcEnable,dibblerClientEnable);
+    AUTO_WAN_LOG("%s - udhcpcEnable= %s\n",__FUNCTION__,udhcpcEnable);
 #endif
 
     if(*mode == WAN_MODE_DOCSIS)
@@ -748,21 +741,9 @@ int TryAltWan(int *mode)
 // need to start DHCPv6 client when eRouterMode == ERT_MODE_DUAL
         if (eRouterMode == ERT_MODE_IPV6)
         {
-#if defined(INTEL_PUMA7)
-            if(0 == strncmp(dibblerClientEnable, "yes", sizeof(dibblerClientEnable)))
-            {
-#endif
                v_secure_system("killall dibbler-client");
                v_secure_system("sh /lib/rdk/dibbler/dibbler-init.sh");
                v_secure_system("/usr/sbin/dibbler-client start");
-#if defined(INTEL_PUMA7)
-            }
-            else
-            {
-               v_secure_system("killall ti_dhcpv6c");
-               v_secure_system("ti_dhcp6c -plugin /lib/libgw_dhcp6plg.so -i %s -p /var/run/erouter_dhcp6c.pid &", wanPhyName);
-            }
-#endif
         } // (eRouterMode == ERT_MODE_IPV6)
         else if(eRouterMode == ERT_MODE_IPV4 || eRouterMode == ERT_MODE_DUAL)
         {
@@ -807,18 +788,7 @@ int TryAltWan(int *mode)
         } /* (eRouterMode == ERT_MODE_IPV4 || eRouterMode == ERT_MODE_DUAL)*/
         else if (eRouterMode == ERT_MODE_IPV6)
         {
-#if defined (INTEL_PUMA7)
-           if(0 == strncmp(dibblerClientEnable, "yes", sizeof(dibblerClientEnable)))
-           {
-#endif
               v_secure_system("killall dibbler-client");
-#if defined (INTEL_PUMA7)
-           }
-           else
-           {
-              v_secure_system("killall ti_dhcpv6c");
-           }
-#endif
         } /*(eRouterMode == ERT_MODE_IPV6) */
 
         CosaDmlEthWanSetEnable(FALSE);
