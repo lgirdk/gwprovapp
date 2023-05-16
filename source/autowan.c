@@ -583,10 +583,6 @@ int TryAltWan(int *mode)
     char wanPhyName[20] = {0};
     int eRouterMode = ERT_MODE_IPV4;
 
-#if defined(INTEL_PUMA7)
-    char udhcpcEnable[20] = {0};
-#endif
-
     syscfg_get(NULL, "wan_physical_ifname", out_value, sizeof(out_value));
 
     AUTO_WAN_LOG("%s - syscfg returned wan_physical_ifname= %s\n",__FUNCTION__,out_value);
@@ -607,16 +603,6 @@ int TryAltWan(int *mode)
     }
 
     AUTO_WAN_LOG("%s - wanPhyName= %s erouter_mode=%d\n",__FUNCTION__,wanPhyName,eRouterMode);
-
-#if defined(INTEL_PUMA7)
-    memset(out_value, 0, sizeof(out_value));
-    if (!syscfg_get(NULL, "UDHCPEnable_v2", out_value, sizeof(out_value)))
-    {
-       snprintf(udhcpcEnable, sizeof(udhcpcEnable), "%s", out_value);
-    }
-
-    AUTO_WAN_LOG("%s - udhcpcEnable= %s\n",__FUNCTION__,udhcpcEnable);
-#endif
 
     if(*mode == WAN_MODE_DOCSIS)
     { 
@@ -748,16 +734,8 @@ int TryAltWan(int *mode)
         else if(eRouterMode == ERT_MODE_IPV4 || eRouterMode == ERT_MODE_DUAL)
         {
 #if defined(INTEL_PUMA7)
-            if(0 == strncmp(udhcpcEnable, "true", 4))
-            {
-               v_secure_system("killall udhcpc");
-               v_secure_system("/sbin/udhcpc -i %s -p /tmp/udhcpc.erouter0.pid -s /etc/udhcpc.script &", wanPhyName);
-            }
-            else
-            {
-               v_secure_system("killall ti_udhcpc");
-               v_secure_system("ti_udhcpc -plugin /lib/libert_dhcpv4_plugin.so -i %s -H DocsisGateway -p /var/run/eRT_ti_udhcpc.pid -B -b 4 &", wanPhyName);
-            }
+            v_secure_system("killall udhcpc");
+            v_secure_system("/sbin/udhcpc -i %s -p /tmp/udhcpc.erouter0.pid -s /etc/udhcpc.script &", wanPhyName);
 #else
             v_secure_system("udhcpc -i %s &", ethwan_ifname);
             v_secure_system("sysctl -w net.ipv6.conf.%s.accept_ra=2",ethwan_ifname);
@@ -773,18 +751,7 @@ int TryAltWan(int *mode)
 
         if(eRouterMode == ERT_MODE_IPV4 || eRouterMode == ERT_MODE_DUAL)
         {
-#if defined (INTEL_PUMA7)
-           if(0 == strncmp(udhcpcEnable, "true", 4))
-           {
-#endif
-              v_secure_system("killall udhcpc");
-#if defined (INTEL_PUMA7)
-           }
-           else
-           {
-              v_secure_system("killall ti_udhcpc");
-           }
-#endif
+            v_secure_system("killall udhcpc");
         } /* (eRouterMode == ERT_MODE_IPV4 || eRouterMode == ERT_MODE_DUAL)*/
         else if (eRouterMode == ERT_MODE_IPV6)
         {
