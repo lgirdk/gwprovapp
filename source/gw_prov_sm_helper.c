@@ -72,6 +72,7 @@ static void *bus_handle = NULL;
 
 #define NUMBER_OF_DATA_MODELS   6
 #define MAX_DATAMODEL_SIZE      256
+#define MAX_RETRY_COUNT_SYSTEM_READY 300
 
 typedef struct ccsp_pair {
   char              *name;
@@ -978,6 +979,37 @@ static bool GW_DmObjectListIsEmpty(void)
     return (gpDmObjectHead == NULL && gpDmObjectHeadAlias == NULL);
 }
 
+/**
+ * @brief checkIfSystemReady Function to query CR and check if system is ready.
+ * This is just in case tr069pa registers for the systemReadySignal event late.
+ * If SystemReadySignal is already sent then this will return 1 indicating system is ready.
+ */
+
+static bool isSystemReady(void)
+{
+    char str[256];
+    unsigned int val;
+    int count = 0;
+
+    snprintf(str, sizeof(str), "eRT.%s", CCSP_DBUS_INTERFACE_CR);
+    // Query CR for system ready
+    while (count < MAX_RETRY_COUNT_SYSTEM_READY)
+    {
+        CcspBaseIf_isSystemReady(bus_handle, str, &val);
+        GWPROV_PRINT("ifSystemReady(): val %u count = %d\n", val, count);
+        if (val)
+        {
+            return true;
+        }
+        else
+        {
+            sleep(1);
+            count++;
+        }
+    }
+    return false;
+}
+
 /**************************************************************************/
 /*! \fn void GW_DmObjectListApply(void);
  **************************************************************************
@@ -989,9 +1021,11 @@ static bool GW_DmObjectListIsEmpty(void)
 static void GW_DmObjectListApply(void)
 {
     bool success = false;
-    DmObject_t *pPrev = NULL;
     DmObject_t *pCurr = gpDmObjectHead;
-
+    DmObject_t *pOld = NULL;
+    DmObject_t *pTmp = NULL;
+    bool systemReady = false;
+    
     if (!init_message_bus())
     {
         return;
@@ -1040,21 +1074,45 @@ static void GW_DmObjectListApply(void)
 #else
     while (pCurr != NULL)
     {
-        GW_SetParam(bus_handle, pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
-
-        if (pCurr == gpDmObjectHead)
+        success = GW_SetParam(bus_handle, pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
+        if (true == success || true == systemReady) //Remove node if set param is success or failed after system ready
         {
-            gpDmObjectHead = pCurr->pNext;
+             if (pCurr == gpDmObjectHead)
+            {
+                gpDmObjectHead = pCurr->pNext;
+            }
+
+            /* free the node */
+            pOld = pCurr;
+            pCurr = pCurr->pNext;
+            free(pOld);
         }
-        else
+        else if (false == systemReady) // set param failed. in first try. Save dml into failed list and retry once the system ready signal received.
         {
-            pPrev->pNext = pCurr->pNext;
+            // keep the node to retry
+            if (pTmp)
+            {
+                pTmp->pNext = pCurr;
+            }
+            pTmp = pCurr;
+
+            // move to the next node
+            pCurr = pCurr->pNext;
+            pTmp->pNext = NULL;
         }
 
-        /* free the node */
-        DmObject_t *pOld = pCurr;
-        pCurr = pCurr->pNext;
-        free(pOld);
+        if (NULL == pCurr && pTmp!= NULL && false == systemReady) // reached end of the list and retry is needed
+        {
+            // wait for system ready signal or 300 sec max.
+            systemReady = isSystemReady();
+            if (false == systemReady)
+            {
+                GWPROV_PRINT("ERROR: System ready signal is not yet received");
+                systemReady = true; // mark system ready as true and retry with the failed list
+            }
+            // reset the List and retry again.
+            pCurr = gpDmObjectHead;
+        }
     }
 #endif
 
