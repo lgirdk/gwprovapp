@@ -1341,10 +1341,11 @@ static int GWP_act_ProvEntry()
         pthread_create(&sysevent_tid, NULL, GWP_sysevent_threadfunc, NULL);
     }
     memset(buf,0,sizeof(buf));
-
+    //cmxb7-5072
+    int sysGetVar = syscfg_get(NULL, "eth_wan_enabled", buf, sizeof(buf));
     if (0 == access( "/nvram/ETHWAN_ENABLE" , F_OK ))
     {
-        if (syscfg_get(NULL, "eth_wan_enabled", buf, sizeof(buf)) == 0)
+        if (sysGetVar == 0)
         {
             rc = strcmp_s("false",strlen("false"),buf,&ind);
             ERR_CHK(rc);
@@ -1365,6 +1366,17 @@ static int GWP_act_ProvEntry()
     else
     {
         int lastKnownWanMode = WAN_MODE_UNKNOWN; 
+        //cmxb7-5072
+        rc = strcmp_s("true",strlen("true"),buf,&ind);
+        ERR_CHK(rc); 
+        if((ind == 0) && (rc == EOK))
+        {
+            if(syscfg_set_commit(NULL,"eth_wan_enabled", "false") != 0)
+            {
+                GWPROV_PRINT("eth_wan_enabled syscfg failed\n");
+            }
+        }
+
         memset(buf,0,sizeof(buf));
         if (syscfg_get(NULL, "last_wan_mode", buf, sizeof(buf)) == 0)
         {
@@ -1383,6 +1395,7 @@ static int GWP_act_ProvEntry()
             }
         }
     }
+
 
     //Get the ethwan interface name from HAL
     memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
