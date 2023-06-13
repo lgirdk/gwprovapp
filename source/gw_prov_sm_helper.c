@@ -1416,6 +1416,7 @@ static void GW_HandleAliasDmList(void* bus_handle)
                 }
             }
         }
+        pclose(fp);
 
         /* Create new table for entries which are not available in existing list */
         char *lastAlias = NULL;
