@@ -2840,6 +2840,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                            if (hotspot_tid)
                            {
                                pthread_cancel(hotspot_tid);
+                               pthread_join(hotspot_tid, NULL);
                                hotspot_tid = 0;		       
                            }
                            pthread_create(&hotspot_tid, NULL, GWP_start_hotspot_threadfunc, NULL);

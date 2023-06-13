@@ -511,8 +511,6 @@ void *GWP_start_hotspot_threadfunc(void *data)
     int timeout = 30;
     char erouter_ipv6[64];
 
-    pthread_detach(pthread_self());
-
     while(--timeout >= 0)
     {
         erouter_ipv6[0] = 0;
