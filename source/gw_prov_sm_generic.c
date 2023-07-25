@@ -80,6 +80,12 @@
 #include "rdk_debug.h"
 #endif
 
+#if defined (WIFI_MANAGE_SUPPORTED)
+#include <ccsp_base_api.h>   // for CCSP_Message_Bus_Init/Exit
+#include "ccsp_memory.h"        // for AnscAllocate/FreeMemory
+#include "ccsp_psm_helper.h"
+#endif /*WIFI_MANAGE_SUPPORTED*/
+
 #include "ccsp_hal_ethsw.h"
 #include <telemetry_busmessage_sender.h>
 #include "safec_lib_common.h"
@@ -162,6 +168,16 @@
 #define BASE_MAC_WLAN_OFFSET_SYSCFG_KEY      "base_mac_wlan_offset"
 #define BASE_MAC_WLAN_OFFSET                 145
 #endif
+
+#if defined (WIFI_MANAGE_SUPPORTED)
+#define BUF_LEN_8 8
+#define MANAGE_WIFI_INDEX_STRING "dmsb.MultiLAN.ManageWiFi_l3net"
+
+static char *component_id = "ccsp.GwProvUtopia";
+static char *pCfg       = CCSP_MSG_BUS_CFG;
+static void  *bus_handle  = NULL;
+static char *g_Subsystem = "eRT." ;
+#endif /*WIFI_MANAGE_SUPPORTED*/
 
 #ifdef FEATURE_SUPPORT_RDKLOG
 void GWPROV_PRINT(const char *format, ...)
@@ -717,7 +733,6 @@ void getMultiCastGroupAddress(unsigned char *inetAddr, unsigned char *inetMcgrpA
 
     return;
 }
-
 /**************************************************************************/
 /*! \fn void *GWP_sysevent_threadfunc(void *data)
  **************************************************************************
@@ -1155,7 +1170,34 @@ static void *GWP_sysevent_threadfunc(void *data)
 #if defined(RDK_ONEWIFI) && (defined(_XB6_PRODUCT_REQ_) || defined(_WNXL11BWL_PRODUCT_REQ_))
         GWPROV_PRINT("CALL VLAN UTIL TO SET UP LNF\n");
         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "lnf-setup","6", 0);
-#endif 
+#endif
+#if defined (WIFI_MANAGE_SUPPORTED)
+                          char aManageWiFiEnabled[BUF_LEN_8] = {0};
+                          int retPsmGet = CCSP_SUCCESS;
+                          char *pParamVal = NULL;
+                          syscfg_get(NULL, "Manage_WiFi_Enabled", aManageWiFiEnabled, sizeof(aManageWiFiEnabled));
+                          GWPROV_PRINT("aManageWiFiEnabled:%s\n", aManageWiFiEnabled);
+                          if (!strncmp(aManageWiFiEnabled, "true", 4))
+                          {
+                              if (NULL != bus_handle)
+                              {
+                                  retPsmGet = PSM_Get_Record_Value2(bus_handle,g_Subsystem, MANAGE_WIFI_INDEX_STRING, NULL, &pParamVal);
+                                  if ((retPsmGet == CCSP_SUCCESS) && (NULL != pParamVal))
+                                  {
+                                      GWPROV_PRINT("setting multinet-up %s\n", pParamVal);
+                                      sysevent_set(sysevent_fd_gs, sysevent_token_gs, "multinet-up",pParamVal, 0);
+                                      if(bus_handle != NULL)
+                                      {
+                                          ((CCSP_MESSAGE_BUS_INFO *)bus_handle)->freefunc(pParamVal);
+                                      }
+                                  }
+                              }
+                              else
+                              {
+                                  GWPROV_PRINT("bus_handle is NULL\n");
+                              }
+                          }
+#endif /*WIFI_MANAGE_SUPPORTED*/
                       }
 #ifdef MULTILAN_FEATURE
                       sysevent_get(sysevent_fd_gs, sysevent_token_gs, "primary_lan_l3net", brlan0_inst, sizeof(brlan0_inst));
@@ -1539,6 +1581,10 @@ pid_t findProcessId(char *processName)
  **************************************************************************/
 int main(int argc, char *argv[])
 {
+#if defined (WIFI_MANAGE_SUPPORTED)
+    int ret;
+#endif /*WIFI_MANAGE_SUPPORTED*/
+
     // Buffer characters till newline for stdout and stderr
     setlinebuf(stdout);
     setlinebuf(stderr);
@@ -1560,6 +1606,15 @@ int main(int argc, char *argv[])
 #endif
 
     GWP_act_ProvEntry();
+#if defined (WIFI_MANAGE_SUPPORTED)
+    ret = CCSP_Message_Bus_Init(component_id, pCfg, &bus_handle,(CCSP_MESSAGE_BUS_MALLOC) Ansc_AllocateMemory_Callback, Ansc_FreeMemory_Callback);
+    if (ret == -1)
+    {
+            GWPROV_PRINT("%s : Message bus init failed\n",__FUNCTION__);
+            return -1;
+    }
+#endif /*WIFI_MANAGE_SUPPORTED*/
+
     GWPROV_PRINT("wait in loop \n");
 	while (1)
 	{
@@ -1572,7 +1627,11 @@ int main(int argc, char *argv[])
         GWPROV_PRINT(" gw_prov_utopia already running. Returning...\n");
         return 1;
     }
-   
+
+#if defined (WIFI_MANAGE_SUPPORTED)
+    if( bus_handle != NULL )
+        CCSP_Message_Bus_Exit(bus_handle);
+#endif /*WIFI_MANAGE_SUPPORTED*/
 
     return 0;
 
