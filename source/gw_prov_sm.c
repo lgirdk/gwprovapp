@@ -136,6 +136,10 @@
 #define TLV202_42_FAVOR_DEPTH 1
 #define TLV202_42_FAVOR_WIDTH 2
 
+#ifdef MODEM_ONLY_SUPPORT
+#define ETHWAN_DEF_INTF_NAME "eth0"
+#endif
+
 /*! New implementation*/
 
 #define BRMODE_ROUTER 0
@@ -2375,6 +2379,14 @@ static int GWP_act_DocsisLinkDown_callback_1()
     printf("\n**************************\n");
     printf("\nsysevent set phylink_wan_state down\n");
     printf("\n**************************\n\n");
+#ifdef MODEM_ONLY_SUPPORT
+    unsigned char ethwan_ifname[ 64 ];
+    memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
+    sprintf( ethwan_ifname , "%s", ETHWAN_DEF_INTF_NAME );
+    GWPROV_PRINT("Docsis Link Down : disable macsec port %s \n", ethwan_ifname);
+    v_secure_system("ip link set dev %s down",ethwan_ifname);
+#endif    
+
     return 0;
 }
 
@@ -2457,6 +2469,13 @@ static int GWP_act_DocsisLinkUp_callback()
     printf("\n**************************\n");
     printf("\nsysevent set phylink_wan_state up\n");
     printf("\n**************************\n\n");
+#ifdef MODEM_ONLY_SUPPORT
+    unsigned char ethwan_ifname[ 64 ];
+    memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
+    sprintf( ethwan_ifname , "%s", ETHWAN_DEF_INTF_NAME );
+    GWPROV_PRINT("Docsis Link Up : enable macsec port %s \n", ethwan_ifname);
+    v_secure_system("ip link set dev %s up",ethwan_ifname);
+#endif
 
     
 #if defined(_PLATFORM_RASPBERRYPI_)
