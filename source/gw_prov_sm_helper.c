@@ -1809,7 +1809,7 @@ static void *GW_DmObjectThread(void *pParam)
             system("touch /tmp/cfg_file_applied");
 #if defined(_PUMA6_ARM_)
             system("rpcclient2 'touch /tmp/cfg_file_applied' &");
-#endf
+#endif
             gbDmObjectParseCfgDone = false;
         }
     }
