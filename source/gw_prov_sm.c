@@ -2470,10 +2470,19 @@ static int GWP_act_DocsisLinkUp_callback()
     printf("\n**************************\n\n");
 #ifdef MODEM_ONLY_SUPPORT
     unsigned char ethwan_ifname[ 64 ];
+    int ret;
     memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
     sprintf( ethwan_ifname , "%s", ETHWAN_DEF_INTF_NAME );
-    GWPROV_PRINT("Docsis Link Up : enable macsec port %s \n", ethwan_ifname);
-    v_secure_system("ip link set dev %s up",ethwan_ifname);
+    ret = v_secure_system("ip link show %s | grep DOWN > /dev/null", ethwan_ifname);
+
+    if (ret == 0)
+    {
+       GWPROV_PRINT("Docsis Link Up : enable macsec port %s \n", ethwan_ifname);
+       v_secure_system("ip link set dev %s up",ethwan_ifname);
+    }
+    else
+       GWPROV_PRINT("Docsis Link Up : macsec port is already UP %s \n", ethwan_ifname);
+
 #endif
 
     
