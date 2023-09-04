@@ -1778,10 +1778,9 @@ void GWP_UpdateERouterMode(void)
                 /* Update ESAFE state */
                 GWP_UpdateEsafeAdminMode(eRouterMode);
 #endif
-                sysevent_set(sysevent_fd_gs, sysevent_token_gs, "erouter_mode-updated", "", 0);
-
                 if(!once)
                     check_lan_wan_ready();
+                sysevent_set(sysevent_fd_gs, sysevent_token_gs, "erouter_mode-updated", "", 0);
             }
         }
     }
@@ -2096,15 +2095,6 @@ static void check_lan_wan_ready()
 			    {
                             	sysevent_set(sysevent_fd_gs, sysevent_token_gs, "start-misc", "ready", 0);
 				once = 1;
-                            }
-			}
-			else
-			{
-                            rc = strcmp_s("starting", strlen("starting"),wan_st, &ind);
-                            ERR_CHK(rc);
-                            if((ind != 0) && (rc == EOK))
-                            {
-                                sysevent_set(sysevent_fd_gs, sysevent_token_gs, "wan-restart", "1", 0);
                             }
 			}
 		}
