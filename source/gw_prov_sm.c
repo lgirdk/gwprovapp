@@ -3363,7 +3363,7 @@ if( uid == 0 )
     sysevent_fd = sysevent_open("127.0.0.1", SE_SERVER_WELL_KNOWN_PORT, SE_VERSION, "gw_prov", &sysevent_token);
     if (sysevent_fd >= 0)
     {
-        sysevent_set(sysevent_fd_gs, sysevent_token_gs, "phylink_wan_state", "down", 0);
+        sysevent_set(sysevent_fd, sysevent_token, "phylink_wan_state", "down", 0);
         GWPROV_PRINT(" Creating Thread  GWP_sysevent_threadfunc \n"); 
         pthread_create(&sysevent_tid, NULL, GWP_sysevent_threadfunc, NULL);
     }
