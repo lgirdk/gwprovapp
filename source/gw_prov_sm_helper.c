@@ -1018,6 +1018,8 @@ static void GW_DmObjectListApply(void)
     DmObject_t *pCurr = gpDmObjectHead;
     DmObject_t *pOld = NULL;
     DmObject_t *pTmp = NULL;
+    DmObject_t *pPrevFailed = NULL;
+    DmObject_t *pCurrFailed = NULL;
     bool systemReady = false;
     
     if (!init_message_bus())
@@ -1071,11 +1073,42 @@ static void GW_DmObjectListApply(void)
         success = GW_SetParam(bus_handle, pCurr->Name, GW_MapTr69TypeToDmcliType(pCurr->Type), pCurr->Value);
         if (true == success || true == systemReady) //Remove node if set param is success or failed after system ready
         {
-             if (pCurr == gpDmObjectHead)
+            if (pCurr == gpDmObjectHead)
             {
                 gpDmObjectHead = pCurr->pNext;
             }
-
+            /* If the failed list is not empty, then check the current set parameter is there in the failed list.
+             * If the current parameter is there in failed list then remove the parameter from failed list.
+             * No need to set the parameter again from the failed list to preserve the tlv paramater precedence.
+             * Remove node if set param is success or failed while parsing the failed list */ 
+            if (pTmp != NULL && systemReady != true)
+            {
+               pCurrFailed=gpDmObjectHead;
+               while (pCurrFailed != NULL)
+               {
+                  if (!strcmp(pCurr->Name,pCurrFailed->Name)) //if both parameters are same, then delete the node from failed list.
+                  {
+                     if (pTmp == gpDmObjectHead) // if only one node is there in the failed list,then delete that node and made the failed list null.
+                     {
+                        gpDmObjectHead=pCurr->pNext;
+                        free(pTmp);
+                        pTmp=NULL;
+                        pCurrFailed=NULL;
+                     }
+                     else
+                     {
+                        gpDmObjectHead=pCurrFailed->pNext;
+                        pPrevFailed=pCurrFailed;
+                        pCurrFailed = pCurrFailed->pNext;
+                        free(pPrevFailed);
+                     }
+                  }
+                  else
+                  {
+                     pCurrFailed = pCurrFailed->pNext;
+                  }
+               }
+            }
             /* free the node */
             pOld = pCurr;
             pCurr = pCurr->pNext;
