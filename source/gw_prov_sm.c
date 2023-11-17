@@ -2561,7 +2561,32 @@ static int GWP_act_DocsisLinkUp_callback()
         }
     }
 #endif
-    #if defined(ENABLE_LLD_SUPPORT)
+    #if defined(ENABLE_LLD_SUPPORT) && defined(MODEM_ONLY_SUPPORT)
+    /* XD4-427
+       In good bootup, the call to low_latency_docsis_status_check function
+       happened after valid value in ipv6_prefix.
+       Added a check to make sure the call to low_latency_docsis_status_check is after
+       "wan-status" started. Since XD4 could be operating in different modes, a delay is added
+       after "wan-status" has started.
+       This is not a fix for crash but a potential fix to avoid the crash.
+    */
+    char wan_status[16] = {0};
+    int count = 0;
+
+    do {
+        wan_status[0] = '\0';
+        sysevent_get(sysevent_fd_gs, sysevent_token_gs, "wan-status", wan_status, sizeof(wan_status));
+        if (strncmp(wan_status, "started", strlen("started"))) {
+            sleep(1);
+            count++;
+        } else {
+            GWPROV_PRINT("%s - \"wan-status\" has started\n", __func__);
+            sleep(3);
+            break;
+        }
+    } while (count < 20);
+    low_latency_docsis_status_check();
+    #elif defined(ENABLE_LLD_SUPPORT)
     sleep(10); // waiting for docsis to be completely up
     low_latency_docsis_status_check();
     #endif
