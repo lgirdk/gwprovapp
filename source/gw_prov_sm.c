@@ -2561,33 +2561,10 @@ static int GWP_act_DocsisLinkUp_callback()
         }
     }
 #endif
-    #if defined(ENABLE_LLD_SUPPORT) && defined(MODEM_ONLY_SUPPORT)
-    /* XD4-427
-       In good bootup, the call to low_latency_docsis_status_check function
-       happened after valid value in ipv6_prefix.
-       Added a check to make sure the call to low_latency_docsis_status_check is after
-       "wan-status" started. Since XD4 could be operating in different modes, a delay is added
-       after "wan-status" has started.
-       This is not a fix for crash but a potential fix to avoid the crash.
-    */
-    char wan_status[16] = {0};
-    int count = 0;
-
-    do {
-        wan_status[0] = '\0';
-        sysevent_get(sysevent_fd_gs, sysevent_token_gs, "wan-status", wan_status, sizeof(wan_status));
-        if (strncmp(wan_status, "started", strlen("started"))) {
-            sleep(1);
-            count++;
-        } else {
-            GWPROV_PRINT("%s - \"wan-status\" has started\n", __func__);
-            sleep(3);
-            break;
-        }
-    } while (count < 20);
-    low_latency_docsis_status_check();
-    #elif defined(ENABLE_LLD_SUPPORT)
+    #if defined(ENABLE_LLD_SUPPORT)
+    #if !defined(MODEM_ONLY_SUPPORT)
     sleep(10); // waiting for docsis to be completely up
+    #endif
     low_latency_docsis_status_check();
     #endif
 #endif
@@ -3616,27 +3593,33 @@ void low_latency_docsis_status_check(void)
     char sysevent_lld_status_buf[32] = "\0";
     lld_active_status = docsis_LLDgetEnableStatus();
     GWPROV_PRINT("%s : docsis_LLDgetEnableStatus returned %d, prev_lld_active_status is %d\n",__FUNCTION__,lld_active_status,prev_lld_active_status);
+#if defined(MODEM_ONLY_SUPPORT)
+    int fd_gs = sysevent_fd_gs;
+    token_t token_gs = sysevent_token_gs;
+#else
+    int fd_gs = sysevent_fd;
+    token_t token_gs = sysevent_token;
+#endif
     if(lld_active_status != prev_lld_active_status)
     {
-        sysevent_get(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, sysevent_lld_status_buf, sizeof(sysevent_lld_status_buf));
+        sysevent_get(fd_gs, token_gs, LLD_ACTIVE_STATUS_SYSEVENT, sysevent_lld_status_buf, sizeof(sysevent_lld_status_buf));
         GWPROV_PRINT("LLDActiveStatus sysevent is:%s\n",sysevent_lld_status_buf);
 
         if(lld_active_status == ENABLE) 
         {
             GWPROV_PRINT("LLD is enabled. Setting LLD active status as true.\n");
-            sysevent_set(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, "true", 0);
+            sysevent_set(fd_gs, token_gs, LLD_ACTIVE_STATUS_SYSEVENT, "true", 0);
             GWPROV_PRINT("%s Triggering firewall-restart\n",__FUNCTION__);
-            sysevent_set(sysevent_fd, sysevent_token, "firewall-restart", "", 0);
+            sysevent_set(fd_gs, token_gs, "firewall-restart", "", 0);
         }
         else
         {
             GWPROV_PRINT("LLD is disabled. Setting LLD active status as false.\n");
-            sysevent_set(sysevent_fd, sysevent_token, LLD_ACTIVE_STATUS_SYSEVENT, "false", 0);
-
+            sysevent_set(fd_gs, token_gs, LLD_ACTIVE_STATUS_SYSEVENT, "false", 0);
             if ( prev_lld_active_status == ENABLE )
             {
                 GWPROV_PRINT("%s Triggering firewall-restart\n",__FUNCTION__);
-                sysevent_set(sysevent_fd, sysevent_token, "firewall-restart", "", 0);
+                sysevent_set(fd_gs, token_gs, "firewall-restart", "", 0);
             }
         }
         prev_lld_active_status = lld_active_status;
