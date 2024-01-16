@@ -3205,7 +3205,7 @@ static int GWP_act_DocsisInited_callback (void)
          /* The eRouter MUST persist its initialization mode across reinitializations.So, assign last known mode*/
        eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
        GWPROV_PRINT(" eRouterMode = %d\n", eRouterMode);
-       operMode = eRouterMode;
+       operMode =(esafeErouterOperModeExtIf_e)eRouterMode;
 #endif
     }
         GWPROV_PRINT(" operMode = %d\n", operMode);
