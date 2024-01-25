@@ -2471,6 +2471,10 @@ static int GWP_act_DocsisLinkUp_callback()
 #ifdef MODEM_ONLY_SUPPORT
     unsigned char ethwan_ifname[ 64 ];
     int ret;
+
+    GWPROV_PRINT("Docsis Link Up : waiting till docsis is fully up \n");
+    sleep(6);
+
     memset( ethwan_ifname , 0, sizeof( ethwan_ifname ) );
     sprintf( ethwan_ifname , "%s", ETHWAN_DEF_INTF_NAME );
     ret = v_secure_system("ip link show %s | grep DOWN > /dev/null", ethwan_ifname);
