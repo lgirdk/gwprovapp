@@ -942,7 +942,7 @@ CosaDmlEthWanSetEnable
         BOOL                       bEnable
     )
 {
-#if ((defined (_COSA_BCM_ARM_) && !defined(_CBR_PRODUCT_REQ_) && !defined(_PLATFORM_RASPBERRYPI_) && !defined(_PLATFORM_TURRIS_)) || defined(INTEL_PUMA7) || defined(_CBR2_PRODUCT_REQ_))
+#if ((defined (_COSA_BCM_ARM_) && !defined(_CBR_PRODUCT_REQ_) && !defined(_PLATFORM_RASPBERRYPI_) && !defined(_PLATFORM_TURRIS_)) || defined(INTEL_PUMA7) || defined(_CBR2_PRODUCT_REQ_) || defined(_COSA_QCA_ARM_))
 
 #if !defined(AUTO_WAN_ALWAYS_RECONFIG_EROUTER)
     {

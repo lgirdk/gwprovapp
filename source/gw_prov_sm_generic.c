@@ -114,6 +114,8 @@
 #define ETHWAN_DEF_INTF_NAME "nsgmii0"
 #elif defined(_PLATFORM_TURRIS_)
 #define ETHWAN_DEF_INTF_NAME "eth2"
+#elif defined(_XER5_PRODUCT_REQ_)
+#define ETHWAN_DEF_INTF_NAME "eth4"
 #elif defined(_CBR2_PRODUCT_REQ_)
 #define ETHWAN_DEF_INTF_NAME "eth5"
 #else
@@ -778,7 +780,7 @@ static void *GWP_sysevent_threadfunc(void *data)
     sysevent_setnotification(sysevent_fd, sysevent_token, "ipv6_prefix",  &ipv6_prefix_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "bridge-status",  &bridge_status_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "tr_" ER_NETDEVNAME "_dhcpv6_client_v6addr",  &ipv6_status_asyncid);
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
     sysevent_setnotification(sysevent_fd, sysevent_token, "bring-lan",  &pnm_asyncid);
 #else
     sysevent_setnotification(sysevent_fd, sysevent_token, "pnm-status",  &pnm_asyncid);
@@ -940,7 +942,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                 oldRouterMode = eRouterMode;
                 eRouterMode = atoi(val);
             }
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
             else if (ret_value == BRING_LAN)           
 #else
             else if (ret_value == PNM_STATUS)
@@ -1224,7 +1226,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif
 
                       if (!hotspot_started) {
-#if defined(INTEL_PUMA7) || defined(_COSA_BCM_MIPS_) || defined(_COSA_BCM_ARM_) ||  defined(_COSA_INTEL_XB3_ARM_)
+#if defined(INTEL_PUMA7) || defined(_COSA_BCM_MIPS_) || defined(_COSA_BCM_ARM_) ||  defined(_COSA_INTEL_XB3_ARM_) || defined(_COSA_QCA_ARM_)
                           printf("Not Calling hotspot-start for XB3,XB6 and CBR it will be done in \
                                   cosa_start_rem.sh,hotspot.service and xfinity_hotspot_bridge_setup.sh respectively\n");
 #else

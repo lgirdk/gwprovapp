@@ -1183,7 +1183,7 @@ static void GWP_DocsisInited(void)
      eSafeDevice_AddeRouterPhysicalNetworkInterface("usb0", true);
 #endif
 
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
     /* Register on more events */
     registerDocsisEvents();
     
@@ -1837,7 +1837,7 @@ static void *GWP_sysevent_threadfunc(void *data)
     sysevent_setnotification(sysevent_fd, sysevent_token, "ipv6_prefix",  &ipv6_prefix_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "bridge-status",  &bridge_status_asyncid);
     sysevent_setnotification(sysevent_fd, sysevent_token, "tr_" ER_NETDEVNAME "_dhcpv6_client_v6addr",  &ipv6_status_asyncid);
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
     sysevent_setnotification(sysevent_fd, sysevent_token, "bring-lan",  &pnm_asyncid);
 #else
     sysevent_setnotification(sysevent_fd, sysevent_token, "pnm-status",  &pnm_asyncid);
@@ -2003,7 +2003,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                 printf("gw_prov_sm: got system restart\n");
                 GWP_ProcessUtopiaRestart();
             }
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
             else if (ret_value == BRING_LAN)           
 #else
             else if (ret_value == PNM_STATUS)
@@ -2247,7 +2247,7 @@ static void *GWP_sysevent_threadfunc(void *data)
 #endif
                    
                     if (!hotspot_started) {
-#if defined(INTEL_PUMA7) || defined(_COSA_BCM_MIPS_) || defined(_COSA_BCM_ARM_) ||  defined(_COSA_INTEL_XB3_ARM_)
+#if defined(INTEL_PUMA7) || defined(_COSA_BCM_MIPS_) || defined(_COSA_BCM_ARM_) ||  defined(_COSA_INTEL_XB3_ARM_) || defined(_COSA_QCA_ARM_)
                         printf("Not Calling hotspot-start for XB3,XB6 and CBR it will be done in \
 				cosa_start_rem.sh,hotspot.service and xfinity_hotspot_bridge_setup.sh respectively\n");
 #else
@@ -3111,7 +3111,7 @@ static int GWP_act_DocsisInited_callback (void)
     /* Coverity Issue Fix - CID:73933 : UnInitialised variable */
     char soladdrStr[64] = {0};
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
-#if !defined(_PLATFORM_RASPBERRYPI_) && !defined(INTEL_PUMA7) && !defined(_COSA_BCM_ARM_)
+#if !defined(_PLATFORM_RASPBERRYPI_) && !defined(INTEL_PUMA7) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
     /* Docsis initialized */
     printf("Got DOCSIS Initialized\n");
 
@@ -3138,7 +3138,7 @@ static int GWP_act_DocsisInited_callback (void)
         //GWP_SysCfgSetInt("last_erouter_mode", 0);
      }
 
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
 	printf("Not Initializing bridge_mode and eRouterMode for XB3\n");
 #else
     int sysevent_bridge_mode = 0;
@@ -3154,7 +3154,7 @@ static int GWP_act_DocsisInited_callback (void)
 //
 //         bridge_mode = eRouterMode == DOCESAFE_ENABLE_DISABLE_extIf ? 2 : 0;
 //     }
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
 	printf("Not Initializing bridge_mode and eRouterMode for XB3\n");
 #elif defined(_PLATFORM_RASPBERRYPI_)
     printf("Not Initializing bridge_mode and eRouterMode for Raspberry Pi\n");
@@ -3414,7 +3414,7 @@ if ( uid == 0 )
 
     printf("Waiting for Docsis INIT\n");
 
-#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_)
+#if !defined(INTEL_PUMA7) && !defined(_COSA_BCM_MIPS_) && !defined(_COSA_BCM_ARM_) && !defined(_COSA_QCA_ARM_)
     bridge_mode = GWP_SysCfgGetInt("bridge_mode");
     eRouterMode = GWP_SysCfgGetInt("last_erouter_mode");
 
