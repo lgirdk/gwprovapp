@@ -320,6 +320,8 @@ static void *GWP_UpdateTr069CfgThread( void *data );
 
 void GWP_Util_get_shell_output( char *cmd, char *out, int len );
 
+pid_t findProcessId(char *processName);
+
 int COMMONUTILS_file_write(const char *string, char *cmdline, int len);
 
 STATUS GWP_InitDB(void);
