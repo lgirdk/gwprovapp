@@ -614,23 +614,6 @@ void startWebUIProcess();
 void sendProcessReadySignal();
 
 /** 
-* @brief Find process Id of specified process.
-*\n Prototype :
-        pid_t findProcessId
-	(
-		char *processName
-	)
-*\n Caller : int main(int argc, char *argv[]).
-*
-*
-* @param[in] char *argv[0] - Process name whose process id need to 
-*			     be find out.
-* @param[out] None.
-* @retval pid_t : Process Id.
-*/
-pid_t findProcessId(char *processName);
-
-/** 
 * @brief Register exception handlers for the process as part of PCD.
 *\n Prototype :
        	void registerProcessExceptionHandlers
