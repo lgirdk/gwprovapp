@@ -2220,7 +2220,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                         if (buf[0] != '\0') sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", buf, 0);
 #endif
 
-#if defined(RDK_ONEWIFI) && (defined(_XB6_PRODUCT_REQ_) || defined(_WNXL11BWL_PRODUCT_REQ_))
+#if defined(RDK_ONEWIFI) && (defined(_XB6_PRODUCT_REQ_) || defined(_WNXL11BWL_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_))
         GWPROV_PRINT("CALL VLAN UTIL TO SET UP LNF\n");
         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "lnf-setup","6", 0);
 #endif 
@@ -2483,6 +2483,7 @@ static int GWP_act_DocsisLinkUp_callback()
 
     if (ret == 0)
     {
+       GWPROV_PRINT("Two Box LAN Port:Re-Initializing:WAN\n");
        GWPROV_PRINT("Docsis Link Up : enable macsec port %s \n", ethwan_ifname);
        v_secure_system("ip link set dev %s up",ethwan_ifname);
     }

@@ -957,7 +957,7 @@ CosaDmlEthWanSetEnable
     }
 #endif
 
-#if !defined (_WNXL11BWL_PRODUCT_REQ_)
+#if (!defined (_WNXL11BWL_PRODUCT_REQ_) && !defined(_SCER11BEL_PRODUCT_REQ_))
     CcspHalExtSw_setEthWanPort ( ETHWAN_DEF_INTF_NUM );
 
     if ( RETURN_OK == CcspHalExtSw_setEthWanEnable( bEnable ) ) 

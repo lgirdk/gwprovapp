@@ -114,7 +114,7 @@
 #define ETHWAN_DEF_INTF_NAME "nsgmii0"
 #elif defined(_PLATFORM_TURRIS_)
 #define ETHWAN_DEF_INTF_NAME "eth2"
-#elif defined(_XER5_PRODUCT_REQ_)
+#elif defined(_XER5_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_)
 #define ETHWAN_DEF_INTF_NAME "eth4"
 #elif defined(_CBR2_PRODUCT_REQ_)
 #define ETHWAN_DEF_INTF_NAME "eth5"
@@ -999,7 +999,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                     }
 #endif
 
-#ifndef XB10_ONLY_SUPPORT
+#if !defined(XB10_ONLY_SUPPORT) && !defined(_SCER11BEL_PRODUCT_REQ_)
                     if(0 != platform_hal_setLed(&ledMgmt)) {
                         GWPROV_PRINT("platform_hal_setLed failed\n");
                     }
@@ -1100,7 +1100,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                             GWPROV_PRINT("Device is not in Captive Portal, setting LED to SOLID WHITE \n");
                         }
 
-#ifndef XB10_ONLY_SUPPORT
+#if !defined(XB10_ONLY_SUPPORT) && !defined(_SCER11BEL_PRODUCT_REQ_)
                         if(0 != platform_hal_setLed(&ledMgmt)) {
                             GWPROV_PRINT("platform_hal_setLed failed\n");
                         }
@@ -1172,7 +1172,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                           if (buf[0] != '\0') sysevent_set(sysevent_fd_gs, sysevent_token_gs, "ipv4-up", buf, 0);
 #endif
 
-#if defined(RDK_ONEWIFI) && (defined(_XB6_PRODUCT_REQ_) || defined(_WNXL11BWL_PRODUCT_REQ_))
+#if defined(RDK_ONEWIFI) && (defined(_XB6_PRODUCT_REQ_) || defined(_WNXL11BWL_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_CBR2_PRODUCT_REQ_))
         GWPROV_PRINT("CALL VLAN UTIL TO SET UP LNF\n");
         sysevent_set(sysevent_fd_gs, sysevent_token_gs, "lnf-setup","6", 0);
 #endif
@@ -1461,7 +1461,7 @@ static int GWP_act_ProvEntry()
 
     GWPROV_PRINT(" EthWanInterfaceName: %s \n", ethwan_ifname );
 
-#if defined (_BRIDGE_UTILS_BIN_) && !defined (_WNXL11BWL_PRODUCT_REQ_)
+#if defined (_BRIDGE_UTILS_BIN_) && (!defined (_WNXL11BWL_PRODUCT_REQ_) && !defined(_SCER11BEL_PRODUCT_REQ_))
     if ( syscfg_set_commit( NULL, "eth_wan_iface_name", ethwan_ifname ) != 0 )
     {
         GWPROV_PRINT( "syscfg_set failed for eth_wan_iface_name\n" );
@@ -1602,9 +1602,10 @@ int main(int argc, char *argv[])
        rdk_logger_init(DEBUG_INI_NAME);
     #endif
 
-#ifndef _WNXL11BWL_PRODUCT_REQ_
+#if !defined(_WNXL11BWL_PRODUCT_REQ_) 
     GWPROV_PRINT(" Entry gw_prov_utopia\n");
     GWPROV_PRINT(" Calling /etc/utopia/utopia_init.sh \n");
+    printf(" Calling /etc/utopia/utopia_init.sh \n");
     v_secure_system("/etc/utopia/utopia_init.sh");
 #endif
 

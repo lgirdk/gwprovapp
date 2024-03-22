@@ -4,7 +4,7 @@
 #define DOCSIS_INF_NAME "cm0"
 #if defined (_XB7_PRODUCT_REQ_)
 #define ETHWAN_INF_NAME "eth3"
-#elif defined (_XER5_PRODUCT_REQ_) 
+#elif defined (_XER5_PRODUCT_REQ_) || defined (_SCER11BEL_PRODUCT_REQ_)
 #define ETHWAN_INF_NAME "eth4"
 #elif defined (_CBR2_PRODUCT_REQ_)
 #define ETHWAN_INF_NAME "eth5"
