@@ -2016,12 +2016,12 @@ static void *GWP_sysevent_threadfunc(void *data)
 
                  }
 #endif
-#ifndef XB10_ONLY_SUPPORT
+
 			if(0 != platform_hal_setLed(&ledMgmt)) {
 
 				GWPROV_PRINT("platform_hal_setLed failed\n");
 			}
-#endif
+		
 			// Set LED state to RED
                 }
                 else 
@@ -2102,12 +2102,10 @@ static void *GWP_sysevent_threadfunc(void *data)
                     	GWPROV_PRINT("Device is not in Captive Portal, setting LED to SOLID WHITE \n");
 		    }
 
-#ifndef XB10_ONLY_SUPPORT
 		    if(0 != platform_hal_setLed(&ledMgmt)) {
 			GWPROV_PRINT("platform_hal_setLed failed\n");
 
 		    }
-#endif
                 }
               }
             }
