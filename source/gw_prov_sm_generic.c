@@ -197,7 +197,9 @@ void GWPROV_PRINT(const char *format, ...)
 #define ETHWAN_FILE     "/nvram/ETHWAN_ENABLE"
 #endif
 
+#if !defined(_PLATFORM_RASPBERRYPI_)
 static void _get_shell_output (FILE *fp, char *buf, int len);
+#endif
 
 /* New implementation !*/
 
@@ -323,10 +325,6 @@ int sysevent_fd_gs;
 token_t sysevent_token_gs;
 #endif
 static pthread_t sysevent_tid;
-#if defined(_PLATFORM_RASPBERRYPI_)
-static pthread_t linkstate_tid;
-static pthread_t lxcserver_tid;
-#endif
 static int once = 0;
 static int bridge_mode = BRMODE_ROUTER;
 static int active_mode = BRMODE_ROUTER;
@@ -1144,13 +1142,8 @@ static void *GWP_sysevent_threadfunc(void *data)
                   if ((ind == 0) && (rc == EOK)){
                       if (!webui_started) { 
 #if defined(_PLATFORM_RASPBERRYPI_)
-
-                          rc = strcmp_s("bridge-status", strlen("bridge-status"),name, &ind);
-                          ERR_CHK(rc);
-                          if ((ind == 0) && (rc == EOK)) {
-                              GWP_DisableERouter();
-                          }
-                          v_secure_system("/bin/sh /etc/webgui.sh");
+                          GWPROV_PRINT(" bridge-status = %s start webgui.sh \n", val );
+                          v_secure_system("/bin/sh /etc/webgui.sh &");
 #elif  defined(_CBR2_PRODUCT_REQ_)
                           GWPROV_PRINT(" bridge-status = %s start webgui.sh \n", val );
                           v_secure_system("/bin/sh /etc/webgui.sh &");
@@ -1526,6 +1519,7 @@ static void LAN_start(void)
    return;
 }
 
+#if !defined(_PLATFORM_RASPBERRYPI_)
 static void _get_shell_output (FILE *fp, char *buf, int len)
 {
     if (fp == NULL)
@@ -1548,6 +1542,7 @@ static void _get_shell_output (FILE *fp, char *buf, int len)
         }
     }
 }
+#endif
 
 pid_t findProcessId(char *processName)
 {
