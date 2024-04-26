@@ -30,7 +30,7 @@ gw_prov_utopia_SOURCES = gw_prov_sm.c autowan.c
 endif
 
 gw_prov_utopia_CPPFLAGS = -I$(srcdir)/include -I${top_srcdir}/source
-gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/dbus-1.0 -I${PKG_CONFIG_SYSROOT_DIR}$(libdir)/dbus-1.0/include
+gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp
 
 gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog -lsecure_wrapper -ltelemetry_msgsender -lpthread -lutapi -lutctx -lcm_mgnt -lccsp_common
 
