@@ -997,7 +997,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                     }
 #endif
 
-#if !defined(_SCER11BEL_PRODUCT_REQ_) && !defined(_XER5_PRODUCT_REQ_)
+#if !defined(_SCER11BEL_PRODUCT_REQ_) && !defined(FEATURE_RDKB_LED_MANAGER_PORT)
                     if(0 != platform_hal_setLed(&ledMgmt)) {
 
                         GWPROV_PRINT("platform_hal_setLed failed\n");
@@ -1098,7 +1098,7 @@ static void *GWP_sysevent_threadfunc(void *data)
                             GWPROV_PRINT("Device is not in Captive Portal, setting LED to SOLID WHITE \n");
                         }
 
-#if !defined(_SCER11BEL_PRODUCT_REQ_) && !defined(_XER5_PRODUCT_REQ_)
+#if !defined(_SCER11BEL_PRODUCT_REQ_) && !defined(FEATURE_RDKB_LED_MANAGER_PORT)
                         if(0 != platform_hal_setLed(&ledMgmt)) {
                             GWPROV_PRINT("platform_hal_setLed failed\n");
 
