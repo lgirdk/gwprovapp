@@ -103,6 +103,11 @@
 #define SOLID	0
 #define BLINK	1
 
+#ifdef UNIT_TEST_DOCKER_SUPPORT
+#define STATIC
+#else
+#define STATIC static
+#endif
 
 #if defined (FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
 #include <sysevent/sysevent.h>
@@ -265,7 +270,7 @@ typedef struct
     eGwpThreadType mType;       
 } GwpThread_MsgItem;
 
-static const GwpThread_MsgItem gwpthreadMsgArr[] =
+STATIC const GwpThread_MsgItem gwpthreadMsgArr[] =
 {
     {"erouterModeInternal",                        EROUTER_MODE_INTERNAL},
     {"erouter_mode",                               EROUTER_MODE},
@@ -290,12 +295,26 @@ static const GwpThread_MsgItem gwpthreadMsgArr[] =
 /**************************************************************************/
 /*      LOCAL DECLARATIONS:                                               */
 /**************************************************************************/
-
-static void check_lan_wan_ready();
+#ifdef UNIT_TEST_DOCKER_SUPPORT
+int IsEthWanEnabled(void);
+eGwpThreadType Get_GwpThreadType(char *name);
+int GWPEthWan_SysCfgGetInt(const char *name);
+int GWPETHWAN_SysCfgSetInt(const char *name, int int_value);
+void validate_mode(int *bridge_mode);
+int getSyseventBridgeMode(int erouterMode, int bridgeMode);
+void GWPEthWan_EnterBridgeMode(void);
+void GWPEthWan_EnterRouterMode(void);
+void UpdateActiveDeviceMode();
+void GWPEthWan_ProcessUtopiaRestart(void);
+int GWP_SysCfgGetInt(const char *name);
+void check_lan_wan_ready();
+void LAN_start(void);
+//void _get_shell_output (FILE *fp, char *buf, int len);
+#endif
+STATIC void check_lan_wan_ready();
 
 /* New implementation !*/
-static void LAN_start();
-
+STATIC void LAN_start();
 
 void GWP_Util_get_shell_output( char *cmd, char *out, int len );
 
@@ -343,12 +362,12 @@ static int active_mode = BRMODE_ROUTER;
 unsigned char ethwan_ifname[ 64 ];
 static int ethwan_enabled = 0;
 
-static void GWPEthWan_EnterBridgeMode(void);
-static void GWPEthWan_EnterRouterMode(void);
+STATIC void GWPEthWan_EnterBridgeMode(void);
+STATIC void GWPEthWan_EnterRouterMode(void);
 /**************************************************************************/
 /*      LOCAL FUNCTIONS:                                                  */
 /**************************************************************************/
-static int IsEthWanEnabled(void)
+STATIC int IsEthWanEnabled(void)
 {
     char buf[32];
 
@@ -366,7 +385,7 @@ static int IsEthWanEnabled(void)
     return 0;
 }
 
-static eGwpThreadType Get_GwpThreadType(char *name)
+STATIC eGwpThreadType Get_GwpThreadType(char *name)
 {
     errno_t rc       = -1;
     int     ind      = -1;
@@ -390,7 +409,7 @@ static eGwpThreadType Get_GwpThreadType(char *name)
     return ret;
 }
 
-static int GWPEthWan_SysCfgGetInt(const char *name)
+STATIC int GWPEthWan_SysCfgGetInt(const char *name)
 {
    char out_value[20];
    int outbufsz = sizeof(out_value);
@@ -407,14 +426,14 @@ static int GWPEthWan_SysCfgGetInt(const char *name)
    }
 }
 
-static int GWPETHWAN_SysCfgSetInt(const char *name, int int_value)
+STATIC int GWPETHWAN_SysCfgSetInt(const char *name, int int_value)
 {
    GWPROV_PRINT(" %s : name = %s , value = %d \n", __FUNCTION__, name, int_value);
 
    return syscfg_set_u(NULL, name, int_value);
 }
 
-static void validate_mode(int *bridge_mode)
+STATIC void validate_mode(int *bridge_mode)
 {
     if((*bridge_mode != BRMODE_ROUTER) && (*bridge_mode != BRMODE_PRIMARY_BRIDGE) && (*bridge_mode != BRMODE_GLOBAL_BRIDGE))
     {
@@ -430,7 +449,7 @@ static void validate_mode(int *bridge_mode)
     GWPROV_PRINT(" %s : bridge_mode = %d\n", __FUNCTION__, *bridge_mode);
  }
 
-static int getSyseventBridgeMode(int erouterMode, int bridgeMode)
+STATIC int getSyseventBridgeMode(int erouterMode, int bridgeMode)
 {
     //Erouter mode takes precedence over bridge mode. If erouter is disabled, 
     //global bridge mode is returned. Otherwise partial bridge or router  mode
@@ -445,8 +464,8 @@ static int getSyseventBridgeMode(int erouterMode, int bridgeMode)
 		typedef enum {
 			BRIDGE_MODE_OFF    = 0,
 			BRIDGE_MODE_DHCP   = 1,
-			BRIDGE_MODE_STATIC = 2,
-			BRIDGE_MODE_FULL_STATIC = 3
+			BRIDGE_MODE_static = 2,
+			BRIDGE_MODE_FULL_static = 3
 		   
 		} bridgeMode_t;
 	 */	
@@ -480,7 +499,7 @@ static int getSyseventBridgeMode(int erouterMode, int bridgeMode)
 	}
 }
 
-static void GWPEthWan_EnterBridgeMode(void)
+STATIC void GWPEthWan_EnterBridgeMode(void)
 {
     //GWP_UpdateEsafeAdminMode(DOCESAFE_ENABLE_DISABLE);
     //DOCSIS_ESAFE_SetErouterOperMode(DOCESAFE_EROUTER_OPER_DISABLED);
@@ -505,7 +524,7 @@ static void GWPEthWan_EnterBridgeMode(void)
 }
 
 //Actually enter router mode
-static void GWPEthWan_EnterRouterMode(void)
+STATIC void GWPEthWan_EnterRouterMode(void)
 {
          /* Coverity Issue Fix - CID:71381 : UnInitialised varible */
     char MocaPreviousStatus[16] = {0};
@@ -532,13 +551,13 @@ static void GWPEthWan_EnterRouterMode(void)
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
 }
 
-static void UpdateActiveDeviceMode()
+STATIC void UpdateActiveDeviceMode()
 {
     bridge_mode = GWPEthWan_SysCfgGetInt("bridge_mode");
     active_mode = getSyseventBridgeMode(eRouterMode,bridge_mode);
 }
 
-static void GWPEthWan_ProcessUtopiaRestart(void)
+STATIC void GWPEthWan_ProcessUtopiaRestart(void)
 {
     // This function is called when "system-restart" event is received, This
     // happens when WEBUI change bridge configuration. We do not restart the
@@ -618,7 +637,7 @@ static void GWPEthWan_ProcessUtopiaRestart(void)
  *  \brief Get Syscfg Integer Value
  *  \return int/-1
  **************************************************************************/
-static int GWP_SysCfgGetInt(const char *name)
+STATIC int GWP_SysCfgGetInt(const char *name)
 {
    char out_value[20];
    int outbufsz = sizeof(out_value);
@@ -635,7 +654,7 @@ static int GWP_SysCfgGetInt(const char *name)
    }
 }
 
-static void check_lan_wan_ready()
+STATIC void check_lan_wan_ready()
 {
 	char br_st[16] = { 0 };
 	char lan_st[16] = { 0 };
@@ -1514,7 +1533,7 @@ static int GWP_act_ProvEntry()
     return 0;
 }
 
-static void LAN_start(void)
+STATIC void LAN_start(void)
 {
     GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
 
@@ -1614,6 +1633,7 @@ pid_t findProcessId(char *processName)
 
     return pid;
 }
+
 /**************************************************************************/
 /*! \fn int main(int argc, char *argv)
  **************************************************************************
@@ -1622,7 +1642,7 @@ pid_t findProcessId(char *processName)
  *  \param[in] argv
  *  \return Currently, never exits
  **************************************************************************/
-int main(int argc, char *argv[])
+int gw_prov_sm_main(int argc, char *argv[])
 {
 #if defined (WIFI_MANAGE_SUPPORTED)
     int ret;
@@ -1678,4 +1698,3 @@ int main(int argc, char *argv[])
     return 0;
 
 }
-

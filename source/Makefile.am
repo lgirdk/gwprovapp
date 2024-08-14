@@ -24,12 +24,12 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = gw_prov_utopia
 
 if FEATURE_RDKB_WAN_MANAGER
-gw_prov_utopia_SOURCES = gw_prov_sm_generic.c
+gw_prov_utopia_SOURCES = gw_prov_sm_generic.c gw_prov_sm_generic_main.c
 else
 gw_prov_utopia_SOURCES = gw_prov_sm.c autowan.c
 endif
 
-gw_prov_utopia_CPPFLAGS = -I$(srcdir)/include
+gw_prov_utopia_CPPFLAGS = -I$(srcdir)/include -I${top_srcdir}/source
 gw_prov_utopia_CPPFLAGS += -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/ccsp -I${PKG_CONFIG_SYSROOT_DIR}$(includedir)/dbus-1.0 -I${PKG_CONFIG_SYSROOT_DIR}$(libdir)/dbus-1.0/include
 
 gw_prov_utopia_LDFLAGS = -lsysevent -lsyscfg -lulog -lsecure_wrapper -ltelemetry_msgsender -lpthread -lutapi -lutctx -lcm_mgnt -lccsp_common
@@ -46,6 +46,6 @@ if FEATURE_RDKB_WAN_MANAGER
 gw_prov_utopia_LDFLAGS += -lhal_ethsw
 endif
 
-if WITH_GTEST_SUPPORT
+if UNIT_TEST_DOCKER_SUPPORT
 SUBDIRS = test
 endif
