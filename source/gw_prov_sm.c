@@ -1180,8 +1180,10 @@ static void GWP_EnableERouter(void)
 static void GWP_EnterRouterMode(void)
 {
          /* Coverity Issue Fix - CID:71381 : UnInitialised varible */
+#if !defined (NO_MOCA_FEATURE_SUPPORT)
 	char MocaPreviousStatus[16] = {0};
        	int prev;
+#endif
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
     if (eRouterMode == DOCESAFE_ENABLE_DISABLE_extIf)
          return;
@@ -1192,6 +1194,7 @@ static void GWP_EnterRouterMode(void)
 
 //    bridge_mode = 0;
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", "0", 0);
+#if !defined (NO_MOCA_FEATURE_SUPPORT)
 	syscfg_get(NULL, "MoCA_previous_status", MocaPreviousStatus, sizeof(MocaPreviousStatus));
 	prev = atoi(MocaPreviousStatus);
 	GWPROV_PRINT(" MocaPreviousStatus = %d \n", prev);
@@ -1203,7 +1206,7 @@ static void GWP_EnterRouterMode(void)
 	{
 		v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
 	}
-
+#endif
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool true");
     
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
@@ -1249,9 +1252,12 @@ static void GWP_EnterBridgeMode(void)
     /* Reset Switch, to remove all VLANs */ 
     // GSWT_ResetSwitch();
     //DOCSIS_ESAFE_SetEsafeProvisioningStatusProgress(DOCSIS_EROUTER_INTERFACE, ESAFE_PROV_STATE_NOT_INITIATED);
+#if !defined (NO_MOCA_FEATURE_SUPPORT)
 	char MocaStatus[16]  = {0};
+#endif
 	char BridgeMode[2] = {0};
 	GWPROV_PRINT(" Entry %s \n", __FUNCTION__);
+#if !defined (NO_MOCA_FEATURE_SUPPORT)
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
 	GWPROV_PRINT(" MoCA_current_status = %s \n", MocaStatus);
 	if ((syscfg_set_commit(NULL, "MoCA_previous_status", MocaStatus) != 0))
@@ -1259,6 +1265,7 @@ static void GWP_EnterBridgeMode(void)
         printf("syscfg_set failed\n");
     }
     v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
+#endif
     snprintf(BridgeMode, sizeof(BridgeMode), "%d", active_mode);
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", BridgeMode, 0);
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
@@ -1279,7 +1286,7 @@ static void GWP_EnterPseudoBridgeMode(void)
 //     GWP_UpdateEsafeAdminMode(eRouterMode);
 //     DOCSIS_ESAFE_SetErouterOperMode(DOCESAFE_EROUTER_OPER_NOIPV4_NOIPV6);
 //     DOCSIS_ESAFE_SetEsafeProvisioningStatusProgress(DOCSIS_EROUTER_INTERFACE, ESAFE_PROV_STATE_IN_PROGRESS);
-
+#if !defined (NO_MOCA_FEATURE_SUPPORT)
 char MocaStatus[16] = {0};
 
 	syscfg_get(NULL, "MoCA_current_status", MocaStatus, sizeof(MocaStatus));
@@ -1290,6 +1297,7 @@ char MocaStatus[16] = {0};
     }
 
     v_secure_system("dmcli eRT setv Device.MoCA.Interface.1.Enable bool false");
+#endif
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "bridge_mode", "3", 0);
     v_secure_system("dmcli eRT setv Device.X_CISCO_COM_DeviceControl.ErouterEnable bool false");
     sysevent_set(sysevent_fd_gs, sysevent_token_gs, "forwarding-restart", "", 0);
