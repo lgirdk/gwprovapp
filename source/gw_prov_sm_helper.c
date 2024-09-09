@@ -837,7 +837,7 @@ static bool GW_SetParam(void* bus_handle, const char *pName, const char *pType, 
         ret = GW_SetParameterValue (bus_handle, retName, pType, pValue);
     else
         ret = GW_SetParameterValue (bus_handle, pName, pType, pValue);
-    if (ret <= 1) success=true; 
+    if (ret < 1) success=true; 
 
     /* keep a flag if we ever set a WiFi param so we can apply settings later */
     if (success)
@@ -1114,7 +1114,7 @@ static void GW_DmObjectListApply(void)
             pCurr = pCurr->pNext;
             free(pOld);
         }
-        else if (false == systemReady) // set param failed. in first try. Save dml into failed list and retry once the system ready signal received.
+        else if (false == systemReady || false == success) // set param failed. in first try. Save dml into failed list and retry once the system ready signal received.
         {
             // keep the node to retry
             if (pTmp)
