@@ -108,6 +108,8 @@
 #include <sysevent/sysevent.h>
 #define SYSEVENT_LED_STATE    "led_event"
 #define IPV4_DOWN_EVENT         "rdkb_ipv4_down"
+#define IPV4_UP_EVENT         "rdkb_ipv4_up"
+#define LIMITED_OPERATIONAL   "rdkb_limited_operational"
 int sysevent_led_fd = -1;
 token_t sysevent_led_token;
 #endif
@@ -823,6 +825,9 @@ static void *GWP_sysevent_threadfunc(void *data)
     //     if(netids_inited && snmp_inited && !factory_mode) {
     //         LAN_start();
     //     }
+#if defined(FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
+                   sysevent_led_fd = sysevent_open("127.0.0.1", SE_SERVER_WELL_KNOWN_PORT, SE_VERSION, "WanHandler", &sysevent_led_token);
+#endif
     for (;;)
     {
 #ifdef MULTILAN_FEATURE
@@ -1005,12 +1010,10 @@ static void *GWP_sysevent_threadfunc(void *data)
                         GWPROV_PRINT("Connection failed, Setting LED to RED\n");
                     }
 #if defined(FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
-		   sysevent_led_fd = sysevent_open("127.0.0.1", SE_SERVER_WELL_KNOWN_PORT, SE_VERSION, "WanHandler", &sysevent_led_token);
 		   if(sysevent_led_fd != -1)
 		   {
 			   sysevent_set(sysevent_led_fd, sysevent_led_token, SYSEVENT_LED_STATE, IPV4_DOWN_EVENT, 0);
 			   GWPROV_PRINT(" Sent IPV4_DOWN_EVENT to RdkLedManager for no internet connectivity\n");
-			   sysevent_close(sysevent_led_fd, sysevent_led_token);
 		   }
 #endif
 #endif
@@ -1054,6 +1057,14 @@ static void *GWP_sysevent_threadfunc(void *data)
                           ledMgmt.LedColor = WHITE;
                           ledMgmt.State  = SOLID;
                           ledMgmt.Interval = 0;
+
+#if defined(FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
+                   if(sysevent_led_fd != -1)
+                   {
+                           sysevent_set(sysevent_led_fd, sysevent_led_token, SYSEVENT_LED_STATE, IPV4_UP_EVENT, 0);
+                           GWPROV_PRINT(" Sent IPV4_UP_EVENT to RdkLedManager\n");
+                   }
+#endif
                         }
                         else {
                           GWPROV_PRINT("Current wan interface is not default one.\n");
@@ -1099,6 +1110,13 @@ static void *GWP_sysevent_threadfunc(void *data)
                                                     GWPROV_PRINT("NotifyWiFiChanges is true\n");
                                                     ledMgmt.State	 = BLINK;
                                                     ledMgmt.Interval = 1;
+#if defined(FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
+						    if(sysevent_led_fd != -1)
+						    {
+							    sysevent_set(sysevent_led_fd, sysevent_led_token, SYSEVENT_LED_STATE, LIMITED_OPERATIONAL, 0);
+							    GWPROV_PRINT(" Sent LIMITED_OPERATIONAL to RdkLedManager\n");
+						    }
+#endif
                                                 }
                                             }
                                         }
@@ -1332,6 +1350,12 @@ static void *GWP_sysevent_threadfunc(void *data)
               }
         }
     }
+#if defined(FEATURE_RDKB_LED_MANAGER_LEGACY_WAN)
+    if(sysevent_led_fd != -1)
+    {
+	    sysevent_close(sysevent_led_fd, sysevent_led_token);
+    }
+#endif 
     return 0;
 }
 
